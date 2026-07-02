@@ -1,0 +1,28 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyInstaller / Packaging
+build/
+dist/
+*.spec
+
+# Logs
+*.log
+match_logs/
+daily_logs/
+
+# Databases
+*.db
+
+# Private files / SSL certificates
+key.pem
+cert.pem
+ngrok_config.json
+
+# Executables & Binaries
+cloudflared.exe
+
+# Temporary files
+temp_update/

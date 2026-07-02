@@ -1,0 +1,15 @@
+flask
+flask-socketio
+pandas
+cryptography
+qrcode
+pillow
+eventlet
+xlrd
+openpyxl
+pyinstaller
+pyngrok
+screeninfo
+watchdog
+xlwt
+

@@ -1,0 +1,87 @@
+{
+    "countdown_sec": 90,
+    "slide_duration": 1,
+    "judge_count": 1,
+    "court_no": 1,
+    "tournament_name": "測試",
+    "enable_cloud": false,
+    "poomsae_excel_path": "D:/品勢計分系統/style.xlsx",
+    "draw_range_start": "",
+    "draw_range_end": "",
+    "session_poomsae": {
+        "測試": {
+            "301": [
+                "太極二章 Taegeuk2",
+                "--- 不需選擇 ---"
+            ],
+            "302": [
+                "太極一章 Taegeuk1",
+                ""
+            ],
+            "306": [
+                "太極一章 Taegeuk1",
+                ""
+            ],
+            "303": [
+                "太極一章 Taegeuk1",
+                ""
+            ],
+            "206": [
+                "太極三章 Taegeuk3",
+                ""
+            ],
+            "201": [
+                "太極一章 Taegeuk1",
+                "太極三章 Taegeuk3"
+            ],
+            "337": [
+                "太極三章 Taegeuk3",
+                "--- 不需選擇 ---"
+            ],
+            "582": [
+                "太極二章 Taegeuk2",
+                "太極五章 Taegeuk5"
+            ],
+            "684": [
+                "太極三章 Taegeuk3",
+                "太極六章 Taegeuk6"
+            ],
+            "583": [
+                "太極三章 Taegeuk3",
+                "太極四章 Taegeuk4"
+            ],
+            "686": [
+                "太極二章 Taegeuk2",
+                "太極七章 Taegeuk7"
+            ],
+            "888": [
+                "太極一章 Taegeuk1",
+                "太極四章 Taegeuk4"
+            ],
+            "501": [
+                "太極一章 Taegeuk1",
+                "太極四章 Taegeuk4"
+            ],
+            "506": [
+                "太極四章 Taegeuk4",
+                "--- 不需選擇 ---"
+            ],
+            "502": [
+                "太極三章 Taegeuk3",
+                "太極四章 Taegeuk4"
+            ],
+            "503": [
+                "太極二章 Taegeuk2",
+                "太極三章 Taegeuk3"
+            ],
+            "504": [
+                "太極一章 Taegeuk1",
+                "--- 不需選擇 ---"
+            ]
+        }
+    },
+    "show_draw_button": false,
+    "pk_sequence_mode": 0,
+    "last_excel_directory": "D:/共用資料夾/品勢APP/匯入檔案範例/第5場地",
+    "update_source": "Y:\\競賽軟體"
+}

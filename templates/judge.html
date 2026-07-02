@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>品勢即時評分系統</title>
+    
+    <meta name="theme-color" content="#1a102f">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
+    
+    <!-- 引入樣式與 Google 載入字體 -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=6.0">
+    
+    <!-- Socket.IO 函式庫 -->
+    <script src="{{ url_for('static', filename='socket.io.js') }}"></script>
+</head>
+<body>
+
+    <!-- 1. 登入畫面 -->
+    <div id="login-screen" class="screen">
+        <!-- 登入畫面頂部 Header (與等待畫面完全對齊) -->
+        <div class="waiting-header" style="margin-bottom: 0;">
+            <div></div> <!-- 左側留空 -->
+            <button class="btn-change-judge" onclick="toggleFullscreen()" title="切換全螢幕" style="padding: 6px 10px; margin: 0;">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" style="vertical-align: middle;">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="brand-header">
+            <h1>品勢裁判評分端</h1>
+            <p>請點選您的裁判代號以開始連線</p>
+        </div>
+        
+        <!-- 快速選擇裁判編號 -->
+        <div class="judge-grid">
+            <button class="btn-judge-select" onclick="selectJudge('J1')">J1</button>
+            <button class="btn-judge-select" onclick="selectJudge('J2')">J2</button>
+            <button class="btn-judge-select" onclick="selectJudge('J3')">J3</button>
+            <button class="btn-judge-select" onclick="selectJudge('J4')">J4</button>
+            <button class="btn-judge-select" onclick="selectJudge('J5')">J5</button>
+            <button class="btn-judge-select" onclick="selectJudge('J6')">J6</button>
+            <button class="btn-judge-select" onclick="selectJudge('J7')">J7</button>
+        </div>
+
+        <!-- 保留隱藏的 input 以供自動登入與 J1~J7 快速選擇按鈕的讀寫邏輯 -->
+        <input type="hidden" id="judge-id">
+
+    </div>
+
+    <!-- 2. 等待畫面 -->
+    <div id="waiting-screen" class="screen hidden">
+        <div class="waiting-header">
+            <!-- 左側群組：目前裁判、切換裁判、連線狀態 -->
+            <div style="display: flex; align-items: center; gap: clamp(10px, 2vw, 20px);">
+                <div class="badge">裁判: <span id="display-judge-id"></span></div>
+                <button class="btn-change-judge" onclick="changeJudge()">切換裁判</button>
+                <div class="connection-status" id="connection-status-text">
+                    <span class="pulse-dot" style="background-color: var(--color-warning); box-shadow: 0 0 8px var(--color-warning);"></span>
+                    連線中...
+                </div>
+            </div>
+            
+            <!-- 右側：全螢幕按鈕 -->
+            <button class="btn-change-judge" onclick="toggleFullscreen()" title="切換全螢幕" style="padding: 6px 10px; margin: 0;">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" style="vertical-align: middle;">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="waiting-content">
+            <div class="loader">
+                <div class="ring"></div>
+                <div class="ring"></div>
+                <div class="ring"></div>
+                <span class="loading-text">WAITING</span>
+            </div>
+            <h2>等待主控台載入選手</h2>
+            <p>選手載入後，系統將自動跳轉至評分介面</p>
+            
+            <!-- 賽事與場地連線資訊 -->
+            <div class="waiting-match-info">
+                <div class="info-item">
+                    <span class="lbl">當前賽事</span>
+                    <span class="val" id="waiting-tournament-name">載入中...</span>
+                </div>
+                <div class="info-item">
+                    <span class="lbl">連線場地</span>
+                    <span class="val" id="waiting-court-no">載入中...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. 評分主畫面 -->
+    <div id="scoring-screen" class="screen hidden">
+        <!-- 頂部選手與賽事資訊卡 -->
+        <div class="match-info-card">
+            <div class="info-line-one">
+                <div class="info-left-group">
+                    <span class="info-item-label">類型: <span class="info-item-value" id="info-type">--</span></span>
+                    <span class="info-item-label">組別: <span class="info-item-value" id="info-category">--</span></span>
+                    <span class="info-item-label">級別: <span class="info-item-value" id="info-division">--</span></span>
+                    <span class="info-item-label">輪次: <span class="info-item-value" id="info-phase">--</span></span>
+                </div>
+                
+                <div class="info-right-group" style="display: flex; align-items: center; gap: clamp(6px, 1vw, 12px);">
+                    <button class="btn-reset-score-inline" onclick="toggleFullscreen()" title="切換全螢幕" style="padding: 4px 8px;">
+                        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" style="vertical-align: middle;"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                    </button>
+                    <button id="btn-logout" class="btn-reset-score-inline" onclick="confirmExit()" title="退出連線">
+                        <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none" style="vertical-align: middle; margin-right: 4px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        退出連線
+                    </button>
+                    <span class="info-tag hidden" id="pk-single-role-tag" style="font-weight: 800; padding: 4px 10px; border-radius: 6px; color: #fff;"></span>
+                    <span class="info-tag judge-tag-live" id="display-judge-id-live">J1</span>
+                </div>
+            </div>
+            <div class="info-line-two">
+                <div class="info-player-metadata">
+                    <span class="info-item-label">單位: <span class="info-item-value" id="info-team">--</span></span>
+                    <span class="info-item-label">姓名: <span class="info-item-value info-highlight-name" id="info-player">--</span></span>
+                    <span class="info-item-label">籤號: <span class="info-item-value" id="info-no">--</span></span>
+                </div>
+                
+                <div class="poomsae-stages">
+                    <span class="poomsae-stage-tag" id="poomsae-stage-r1">R1: <span id="info-poomsae-r1">--</span></span>
+                    <span class="poomsae-stage-tag" id="poomsae-stage-r2">R2: <span id="info-poomsae-r2">--</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 評分網格本體 -->
+        <div class="scoring-grid-body">
+            <!-- 左側扣分欄 -->
+            <div class="deduct-column left-column">
+                <div class="deduct-top-row">
+                    <button class="btn-undo-icon" onclick="undoDeduct(0.1)" title="退回">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M9 14L4 9l5-5"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+                    </button>
+                    <div class="deduct-count-formula">
+                        <span>(0.1) × </span><span id="cnt-minor">0</span>
+                    </div>
+                </div>
+                <button class="btn-deduct-giant btn-deduct-minor" onclick="deductAccuracy(0.1)">-0.1</button>
+            </div>
+
+            <!-- 中間評分與調分欄 -->
+            <div class="scoring-center-panel">
+                <div class="scoring-content-scroll">
+                    
+                    <!-- 正確性評分面板 (Accuracy / Technical Skills) -->
+                    <div id="accuracy-panel" class="panel">
+                        <div class="panel-header">
+                            <h3>正確性 (Accuracy)</h3>
+                            <div class="header-right-group">
+                                <div class="panel-score"><span id="val-acc">4.0</span></div>
+                                <button class="btn-quick-score" onclick="openQuickAccModal()">快速評分</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 表現性評分面板 (Presentation) -->
+                    <div id="presentation-panel" class="panel">
+                        <div class="panel-header">
+                            <h3>表現性 (Presentation)</h3>
+                            <div class="header-right-group">
+                                <div class="panel-score"><span id="val-pres">6.0</span></div>
+                                <button class="btn-quick-score" onclick="openQuickPresModal()">快速評分</button>
+                            </div>
+                        </div>
+
+                        <!-- 三個細分項評分區 (p1, p2, p3) -->
+                        <div id="presentation-details" class="pres-sub-grid">
+                            <!-- p1: 速度與力量 -->
+                            <div class="pres-item">
+                                <span class="pres-title">速度與力量</span>
+                                <div class="pres-item-right-wrapper">
+                                    <span class="pres-val-display" id="val-p1">2.0</span>
+                                    <div class="pres-control-group">
+                                        <button class="btn-adjust" onclick="adjustPoomsaeSub('p1', -0.1)">-</button>
+                                        <button class="btn-adjust btn-plus" onclick="adjustPoomsaeSub('p1', 0.1)">+</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- p2: 節奏與協調 -->
+                            <div class="pres-item">
+                                <span class="pres-title">節奏與協調</span>
+                                <div class="pres-item-right-wrapper">
+                                    <span class="pres-val-display" id="val-p2">2.0</span>
+                                    <div class="pres-control-group">
+                                        <button class="btn-adjust" onclick="adjustPoomsaeSub('p2', -0.1)">-</button>
+                                        <button class="btn-adjust btn-plus" onclick="adjustPoomsaeSub('p2', 0.1)">+</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- p3: 精神表現 -->
+                            <div class="pres-item">
+                                <span class="pres-title">精神表現</span>
+                                <div class="pres-item-right-wrapper">
+                                    <span class="pres-val-display" id="val-p3">2.0</span>
+                                    <div class="pres-control-group">
+                                        <button class="btn-adjust" onclick="adjustPoomsaeSub('p3', -0.1)">-</button>
+                                        <button class="btn-adjust btn-plus" onclick="adjustPoomsaeSub('p3', 0.1)">+</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 單一項目調整區 (備用，若後端非細項模式時使用) -->
+                        <div id="presentation-single" class="pres-single-container hidden">
+                            <div class="pres-item">
+                                <div class="pres-item-meta">
+                                    <span class="pres-title">表現性評分</span>
+                                    <span class="pres-val-display" id="val-pres-single">6.0</span>
+                                </div>
+                                <div class="pres-control-group-large">
+                                    <button class="btn-adjust-large" onclick="adjustPresentationSingle(-0.1)">-0.1</button>
+                                    <button class="btn-adjust-large btn-plus" onclick="adjustPresentationSingle(0.1)">+0.1</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 自由品勢評分面板 (Freestyle Panel - 預設隱藏) -->
+                    <div id="freestyle-panel" class="panel hidden">
+                        <div class="panel-header">
+                            <h3>自由品勢評分 (Freestyle)</h3>
+                            <div class="panel-score"><span id="val-free-total">10.0</span></div>
+                        </div>
+                        
+                        <div class="freestyle-body-columns">
+                            <div class="freestyle-col">
+                                <div class="freestyle-section-title">技術分 (Technical Skills - 滿分 6.0)</div>
+                                <div id="freestyle-tech-items" class="pres-sub-grid">
+                                    <!-- 動態生成技術分 6 個項目 -->
+                                </div>
+                            </div>
+                            
+                            <div class="freestyle-col">
+                                <div class="freestyle-section-title">表現分 (Presentation - 滿分 4.0)</div>
+                                <div id="freestyle-pres-items" class="pres-sub-grid">
+                                    <!-- 動態生成表現分 4 個項目 -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+                
+                <!-- 中間底部固定總分與送出面板 -->
+                <!-- 中間底部固定總分與送出面板 -->
+                <div class="center-submit-panel">
+                    <div class="inline-total-score">
+                        <span class="score-lbl">總分</span>
+                        <span class="score-val" id="val-total">10.0</span>
+                    </div>
+                    
+                    <!-- 倒數計時器 -->
+                    <div class="inline-timer-display" id="inline-timer-box">
+                        <span class="timer-val" id="val-timer">1:30</span>
+                    </div>
+                    
+                    <button id="btn-submit" class="btn-submit-score-inline" onclick="submitScore()">送出評分</button>
+                </div>
+            </div>
+
+            <!-- 右側扣分欄 -->
+            <div class="deduct-column right-column">
+                <div class="deduct-top-row">
+                    <div class="deduct-count-formula">
+                        <span>(0.3) × </span><span id="cnt-major">0</span>
+                    </div>
+                    <button class="btn-undo-icon" onclick="undoDeduct(0.3)" title="退回">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M9 14L4 9l5-5"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+                    </button>
+                </div>
+                <button class="btn-deduct-giant btn-deduct-major" onclick="deductAccuracy(0.3)">-0.3</button>
+            </div>
+        </div>
+
+
+
+        <!-- 分數送出等待與修正覆蓋層 -->
+        <div id="submitted-overlay" class="submitted-overlay-screen hidden">
+            <div class="overlay-card">
+                <div class="success-checkmark">
+                    <svg viewBox="0 0 24 24" width="56" height="56" stroke="var(--color-success)" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                </div>
+                <h2>評分已成功送出</h2>
+                <p>等待統計分數...</p>
+                
+                <!-- 優化為三個分數並排區塊 -->
+                <div class="overlay-scores-container" style="display: flex; gap: clamp(8px, 1.5vw, 16px); justify-content: center; width: 100%; margin-top: clamp(8px, 1.5vh, 16px); margin-bottom: clamp(8px, 1.5vh, 16px);">
+                    <!-- 正確性 -->
+                    <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: clamp(6px, 1.2vh, 12px) 0; display: flex; flex-direction: column; align-items: center;">
+                        <span style="font-size: clamp(11px, 2vh, 14px); color: var(--text-muted); font-weight: 600;">正確性</span>
+                        <span style="font-size: clamp(18px, 4.5vh, 28px); font-weight: 800; color: var(--color-danger); margin-top: 4px;" id="submitted-val-acc">0.0</span>
+                    </div>
+                    <!-- 表現性 -->
+                    <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: clamp(6px, 1.2vh, 12px) 0; display: flex; flex-direction: column; align-items: center;">
+                        <span style="font-size: clamp(11px, 2vh, 14px); color: var(--text-muted); font-weight: 600;">表現性</span>
+                        <span style="font-size: clamp(18px, 4.5vh, 28px); font-weight: 800; color: var(--color-info); margin-top: 4px;" id="submitted-val-pres">0.0</span>
+                    </div>
+                    <!-- 總分 -->
+                    <div class="overlay-score-subbox" style="flex: 1; background: rgba(142, 88, 255, 0.08); border: 1px solid rgba(142, 88, 255, 0.2); border-radius: 12px; padding: clamp(6px, 1.2vh, 12px) 0; display: flex; flex-direction: column; align-items: center; box-shadow: 0 0 15px rgba(142, 88, 255, 0.15);">
+                        <span style="font-size: clamp(11px, 2vh, 14px); color: #fff; font-weight: 700; text-shadow: 0 0 5px rgba(255,255,255,0.2);">送出總分</span>
+                        <span style="font-size: clamp(18px, 4.5vh, 28px); font-weight: 900; color: var(--color-success); margin-top: 4px;" id="submitted-val-total">0.0</span>
+                    </div>
+                </div>
+                <div id="final-result-box" class="final-result-box hidden">
+                    <div class="final-score-box">
+                        <span class="score-lbl">最終得分</span>
+                        <span class="score-val" id="final-val-score">0.00</span>
+                    </div>
+                    <div class="final-rank-box">
+                        <span class="score-lbl">目前排名</span>
+                        <span class="score-val" id="final-val-rank">-</span>
+                    </div>
+                </div>
+                
+                <!-- PK 交叉/依序上場 對決分數顯示面板 -->
+                <div id="pk-result-box" class="pk-result-box hidden" style="margin-top: 15px; width: 100%;">
+                    <!-- 1R 分數對決 -->
+                    <div id="pk-res-r1-row" style="display: flex; justify-content: space-around; background: rgba(255,255,255,0.04); padding: clamp(8px, 1.5vh, 16px); border-radius: 12px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.06);">
+                        <div style="text-align: center; flex: 1;">
+                            <div style="color: #00ccff; font-weight: 700; font-size: clamp(12px, 2vh, 15px);">🔵 青方 1R</div>
+                            <div id="pk-res-chung-r1" style="font-size: clamp(20px, 4.5vh, 28px); font-weight: 800; color: #fff; margin-top: 4px;">0.00</div>
+                        </div>
+                        <div style="text-align: center; flex: 1; border-left: 1px solid rgba(255,255,255,0.08);">
+                            <div style="color: #ff3366; font-weight: 700; font-size: clamp(12px, 2vh, 15px);">🔴 紅方 1R</div>
+                            <div id="pk-res-hong-r1" style="font-size: clamp(20px, 4.5vh, 28px); font-weight: 800; color: #fff; margin-top: 4px;">0.00</div>
+                        </div>
+                    </div>
+                    <!-- 2R 與最終得分對決 (2R 結束時顯示) -->
+                    <div id="pk-res-r2-board" class="hidden">
+                        <div style="display: flex; justify-content: space-around; background: rgba(255,255,255,0.04); padding: clamp(8px, 1.5vh, 16px); border-radius: 12px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.06);">
+                            <div style="text-align: center; flex: 1;">
+                                <div style="color: #00ccff; font-weight: 700; font-size: clamp(12px, 2vh, 15px);">🔵 青方 2R</div>
+                                <div id="pk-res-chung-r2" style="font-size: clamp(20px, 4.5vh, 28px); font-weight: 800; color: #fff; margin-top: 4px;">0.00</div>
+                            </div>
+                            <div style="text-align: center; flex: 1; border-left: 1px solid rgba(255,255,255,0.08);">
+                                <div style="color: #ff3366; font-weight: 700; font-size: clamp(12px, 2vh, 15px);">🔴 紅方 2R</div>
+                                <div id="pk-res-hong-r2" style="font-size: clamp(20px, 4.5vh, 28px); font-weight: 800; color: #fff; margin-top: 4px;">0.00</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: space-around; background: rgba(142, 88, 255, 0.08); padding: clamp(8px, 1.5vh, 16px); border-radius: 12px; border: 1px solid rgba(142, 88, 255, 0.2); box-shadow: 0 0 15px rgba(142, 88, 255, 0.1);">
+                            <div style="text-align: center; flex: 1;">
+                                <div style="color: #00ccff; font-weight: 900; font-size: clamp(12px, 2vh, 15px); text-shadow: 0 0 5px rgba(0,204,255,0.2);">🔵 青方 最終</div>
+                                <div id="pk-res-chung-final" style="font-size: clamp(22px, 5vh, 32px); font-weight: 900; color: #00ccff; margin-top: 4px;">0.000</div>
+                            </div>
+                            <div style="text-align: center; flex: 1; border-left: 1px solid rgba(255,255,255,0.08);">
+                                <div style="color: #ff3366; font-weight: 900; font-size: clamp(12px, 2vh, 15px); text-shadow: 0 0 5px rgba(255,51,102,0.2);">🔴 紅方 最終</div>
+                                <div id="pk-res-hong-final" style="font-size: clamp(22px, 5vh, 32px); font-weight: 900; color: #ff3366; margin-top: 4px;">0.000</div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 獲勝方顯示 -->
+                    <div id="pk-res-winner-row" class="hidden" style="margin-top: 12px; text-align: center; background: rgba(0, 0, 0, 0.25); padding: clamp(6px, 1.2vh, 10px); border-radius: 10px; border: 1px dashed rgba(255, 255, 255, 0.15); box-shadow: inset 0 0 10px rgba(0,0,0,0.5);">
+                        <span id="pk-res-winner-text" style="font-size: clamp(15px, 3.2vh, 20px); font-weight: 900; color: #f1c40f; text-shadow: 0 0 10px rgba(241,196,15,0.3);">---</span>
+                    </div>
+                </div>
+                <button id="btn-modify-score" class="btn-modify-score" onclick="modifySubmittedScore()">
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" style="margin-right: 6px; vertical-align: middle;">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                    修改分數
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. PK 同時上場 評分畫面 (Simultaneous PK Scoring Screen) -->
+    <div id="pk-scoring-screen" class="screen hidden">
+
+        <!-- 頂部資訊列 -->
+        <div class="pk-top-bar">
+            <!-- 左側：賽事資訊 -->
+            <div class="pk-top-info-group">
+                <span class="info-item-label">類型: <span class="info-item-value" id="pk-info-type">--</span></span>
+                <span class="info-item-label">組別: <span class="info-item-value" id="pk-info-category">--</span></span>
+                <span class="info-item-label">級別: <span class="info-item-value" id="pk-info-division">--</span></span>
+                <span class="info-item-label">輪次: <span class="info-item-value" id="pk-info-phase">--</span></span>
+            </div>
+            <!-- 右側：型場標籤 + 操作按鈕與裁判代號 -->
+            <div class="pk-top-actions">
+                <!-- 型場標籤（跟一般賽制相同的 R1/R2 双標籤） -->
+                <div class="poomsae-stages" style="margin-right: clamp(6px, 1vw, 12px);">
+                    <span class="poomsae-stage-tag" id="pk-poomsae-stage-r1">R1: <span id="pk-info-poomsae-r1">--</span></span>
+                    <span class="poomsae-stage-tag hidden" id="pk-poomsae-stage-r2">R2: <span id="pk-info-poomsae-r2">--</span></span>
+                </div>
+                <button class="btn-reset-score-inline" onclick="toggleFullscreen()" title="切換全螢幕" style="padding: 4px 8px;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" style="vertical-align: middle;"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                </button>
+                <button class="btn-reset-score-inline" onclick="confirmExit()" title="退出連線">
+                    <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none" style="vertical-align: middle; margin-right: 4px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    退出連線
+                </button>
+                <span class="info-tag judge-tag-live" id="pk-display-judge-id-live">J1</span>
+            </div>
+        </div>
+
+        <!-- 選手資訊列（青 | 送出按鈕+計時器 | 紅）-->
+        <div class="pk-player-bar">
+            <!-- 青方 -->
+            <div class="pk-player-info pk-chung-info">
+                <span class="pk-player-team" id="pk-chung-team">--</span>
+                <span class="pk-player-name" id="pk-chung-name">--</span>
+            </div>
+            <!-- 中間：計時器 -->
+            <div class="pk-center-controls">
+                <div class="pk-timer-display" id="pk-timer-box">
+                    <span class="timer-val" id="pk-val-timer">1:30</span>
+                </div>
+            </div>
+            <!-- 紅方 -->
+            <div class="pk-player-info pk-hong-info">
+                <span class="pk-player-team" id="pk-hong-team">--</span>
+                <span class="pk-player-name" id="pk-hong-name">--</span>
+            </div>
+        </div>
+
+        <!-- 主體三欄：左扣分（青）| 中評分面板 | 右扣分（紅）-->
+        <div class="pk-scoring-grid">
+
+            <!-- ===== 左側：青方扣分欄 ===== -->
+            <div class="pk-deduct-col pk-deduct-chung">
+                <!-- 次數與退回區（在按鈕上方） -->
+                <div class="deduct-stats-area" style="width: 100%;">
+                    <div class="deduct-top-row" style="width: 100%;">
+                        <button class="btn-undo-icon" onclick="pkUndoDeduct('chung', 0.1)" title="退回" style="flex: 1; width: 100%;">
+                            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M9 14L4 9l5-5"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+                        </button>
+                        <div class="deduct-count-formula">
+                            <span>(0.1) × </span><span id="pk-chung-cnt-minor">0</span>
+                        </div>
+                    </div>
+                    <div class="deduct-top-row" style="margin-top: var(--gap-layout); width: 100%;">
+                        <button class="btn-undo-icon" onclick="pkUndoDeduct('chung', 0.3)" title="退回" style="flex: 1; width: 100%;">
+                            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M9 14L4 9l5-5"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+                        </button>
+                        <div class="deduct-count-formula">
+                            <span>(0.3) × </span><span id="pk-chung-cnt-major">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 大按鈕區 -->
+                <button class="btn-deduct-giant btn-deduct-minor pk-deduct-btn" onclick="pkDeductAccuracy('chung', 0.1)">-0.1</button>
+                <button class="btn-deduct-giant btn-deduct-major pk-deduct-btn" style="margin-top: var(--gap-layout);" onclick="pkDeductAccuracy('chung', 0.3)">-0.3</button>
+
+                <!-- 青方總分隱藏 -->
+                <div class="pk-side-total pk-chung-total" style="display: none;">
+                    <span class="score-lbl">總分</span>
+                    <span class="score-val pk-chung-color" id="pk-chung-total">10.0</span>
+                </div>
+            </div>
+
+            <!-- ===== 中間：共用評分面板 ===== -->
+            <div class="pk-center-panel">
+                <div class="pk-scoring-content">
+
+                    <!-- 正確性評分列 -->
+                    <div class="pk-dual-row panel">
+                        <div class="pk-dual-left">
+                            <button class="btn-quick-score" onclick="pkOpenQuickAcc('chung')">快速評分</button>
+                            <div class="panel-score pk-chung-color"><span id="pk-chung-val-acc">4.0</span></div>
+                        </div>
+                        <div class="pk-dual-center-label">
+                            <h3>正確性</h3>
+                            <span class="pk-en-label">Accuracy</span>
+                        </div>
+                        <div class="pk-dual-right">
+                            <div class="panel-score pk-hong-color"><span id="pk-hong-val-acc">4.0</span></div>
+                            <button class="btn-quick-score" onclick="pkOpenQuickAcc('hong')">快速評分</button>
+                        </div>
+                    </div>
+
+                    <!-- 表現性評分列 -->
+                    <div class="pk-dual-row panel">
+                        <div class="pk-dual-left">
+                            <button class="btn-quick-score" onclick="pkOpenQuickPres('chung')">快速評分</button>
+                            <div class="panel-score" style="color: var(--color-info);"><span id="pk-chung-val-pres">6.0</span></div>
+                        </div>
+                        <div class="pk-dual-center-label">
+                            <h3>表現性</h3>
+                            <span class="pk-en-label">Presentation</span>
+                        </div>
+                        <div class="pk-dual-right">
+                            <div class="panel-score" style="color: var(--color-info);"><span id="pk-hong-val-pres">6.0</span></div>
+                            <button class="btn-quick-score" onclick="pkOpenQuickPres('hong')">快速評分</button>
+                        </div>
+                    </div>
+
+                    <!-- 表現性細項（每行：左青分值 | 項目名稱 | 右紅分值） -->
+                    <div class="pk-pres-details panel" id="pk-pres-details-panel">
+
+                        <!-- p1: 速度與力量 -->
+                        <div class="pk-pres-item">
+                            <div class="pk-pres-item-side" style="justify-content: flex-start;">
+                                <div class="pres-control-group">
+                                    <button class="btn-adjust" onclick="pkAdjustPres('chung', 'p1', -0.1)">-</button>
+                                    <button class="btn-adjust btn-plus" onclick="pkAdjustPres('chung', 'p1', 0.1)">+</button>
+                                </div>
+                                <span class="pres-val-display pk-chung-color" id="pk-chung-val-p1" style="margin-left: 10px;">2.0</span>
+                            </div>
+                            <span class="pres-title pk-pres-label">速度與力量</span>
+                            <div class="pk-pres-item-side pk-pres-right-side" style="justify-content: flex-end;">
+                                <span class="pres-val-display pk-hong-color" id="pk-hong-val-p1" style="margin-right: 10px;">2.0</span>
+                                <div class="pres-control-group">
+                                    <button class="btn-adjust btn-plus" onclick="pkAdjustPres('hong', 'p1', 0.1)">+</button>
+                                    <button class="btn-adjust" onclick="pkAdjustPres('hong', 'p1', -0.1)">-</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- p2: 節奏與協調 -->
+                        <div class="pk-pres-item">
+                            <div class="pk-pres-item-side" style="justify-content: flex-start;">
+                                <div class="pres-control-group">
+                                    <button class="btn-adjust" onclick="pkAdjustPres('chung', 'p2', -0.1)">-</button>
+                                    <button class="btn-adjust btn-plus" onclick="pkAdjustPres('chung', 'p2', 0.1)">+</button>
+                                </div>
+                                <span class="pres-val-display pk-chung-color" id="pk-chung-val-p2" style="margin-left: 10px;">2.0</span>
+                            </div>
+                            <span class="pres-title pk-pres-label">節奏與協調</span>
+                            <div class="pk-pres-item-side pk-pres-right-side" style="justify-content: flex-end;">
+                                <span class="pres-val-display pk-hong-color" id="pk-hong-val-p2" style="margin-right: 10px;">2.0</span>
+                                <div class="pres-control-group">
+                                    <button class="btn-adjust btn-plus" onclick="pkAdjustPres('hong', 'p2', 0.1)">+</button>
+                                    <button class="btn-adjust" onclick="pkAdjustPres('hong', 'p2', -0.1)">-</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- p3: 精神表現 -->
+                        <div class="pk-pres-item">
+                            <div class="pk-pres-item-side" style="justify-content: flex-start;">
+                                <div class="pres-control-group">
+                                    <button class="btn-adjust" onclick="pkAdjustPres('chung', 'p3', -0.1)">-</button>
+                                    <button class="btn-adjust btn-plus" onclick="pkAdjustPres('chung', 'p3', 0.1)">+</button>
+                                </div>
+                                <span class="pres-val-display pk-chung-color" id="pk-chung-val-p3" style="margin-left: 10px;">2.0</span>
+                            </div>
+                            <span class="pres-title pk-pres-label">精神表現</span>
+                            <div class="pk-pres-item-side pk-pres-right-side" style="justify-content: flex-end;">
+                                <span class="pres-val-display pk-hong-color" id="pk-hong-val-p3" style="margin-right: 10px;">2.0</span>
+                                <div class="pres-control-group">
+                                    <button class="btn-adjust btn-plus" onclick="pkAdjustPres('hong', 'p3', 0.1)">+</button>
+                                    <button class="btn-adjust" onclick="pkAdjustPres('hong', 'p3', -0.1)">-</button>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- 底部：青紅雙方總分比較列 -->
+                    <div class="pk-bottom-totals panel">
+                        <div class="pk-total-display">
+                            <span class="score-lbl">青方總分</span>
+                            <span class="score-val pk-chung-color" id="pk-chung-bottom-total">10.0</span>
+                        </div>
+                        <button id="pk-btn-submit" class="btn-submit-score-inline pk-submit-btn" onclick="pkSubmitBothScores()">送出評分</button>
+                        <div class="pk-total-display">
+                            <span class="score-lbl">紅方總分</span>
+                            <span class="score-val pk-hong-color" id="pk-hong-bottom-total">10.0</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- ===== 右側：紅方扣分欄 ===== -->
+            <div class="pk-deduct-col pk-deduct-hong">
+                <!-- 次數與退回區（在按鈕上方） -->
+                <div class="deduct-stats-area" style="width: 100%;">
+                    <div class="deduct-top-row" style="width: 100%;">
+                        <div class="deduct-count-formula">
+                            <span>(0.1) × </span><span id="pk-hong-cnt-minor">0</span>
+                        </div>
+                        <button class="btn-undo-icon" onclick="pkUndoDeduct('hong', 0.1)" title="退回" style="flex: 1; width: 100%;">
+                            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M9 14L4 9l5-5"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+                        </button>
+                    </div>
+                    <div class="deduct-top-row" style="margin-top: var(--gap-layout); width: 100%;">
+                        <div class="deduct-count-formula">
+                            <span>(0.3) × </span><span id="pk-hong-cnt-major">0</span>
+                        </div>
+                        <button class="btn-undo-icon" onclick="pkUndoDeduct('hong', 0.3)" title="退回" style="flex: 1; width: 100%;">
+                            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M9 14L4 9l5-5"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 大按鈕區 -->
+                <button class="btn-deduct-giant btn-deduct-minor pk-deduct-btn" onclick="pkDeductAccuracy('hong', 0.1)">-0.1</button>
+                <button class="btn-deduct-giant btn-deduct-major pk-deduct-btn" style="margin-top: var(--gap-layout);" onclick="pkDeductAccuracy('hong', 0.3)">-0.3</button>
+
+                <!-- 紅方總分隱藏 -->
+                <div class="pk-side-total pk-hong-total" style="display: none;">
+                    <span class="score-lbl">總分</span>
+                    <span class="score-val pk-hong-color" id="pk-hong-total">10.0</span>
+                </div>
+            </div>
+
+        </div><!-- end pk-scoring-grid -->
+
+        <!-- PK 送出等待覆蓋層 -->
+        <div id="pk-submitted-overlay" class="submitted-overlay-screen hidden">
+            <div class="overlay-card" style="max-width: 520px; width: 90%;">
+                <div class="success-checkmark">
+                    <svg viewBox="0 0 24 24" width="56" height="56" stroke="var(--color-success)" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                </div>
+                <h2>雙方評分已送出</h2>
+                <p style="margin-bottom: 16px;">等待主控台統計分數...</p>
+                
+                <!-- 青方送出分數總覽 -->
+                <div style="text-align: left; width: 100%; margin-bottom: 16px;">
+                    <div style="font-size: clamp(13px, 2.2vh, 16px); color: var(--color-info); font-weight: 800; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                        <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: var(--color-info);"></span>
+                        青方分數
+                    </div>
+                    <div class="overlay-scores-container" style="display: flex; gap: clamp(8px, 1.5vw, 16px); justify-content: center; width: 100%;">
+                        <!-- 青方 正確性 -->
+                        <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: clamp(6px, 1.2vh, 12px) 0; display: flex; flex-direction: column; align-items: center;">
+                            <span style="font-size: clamp(11px, 2vh, 14px); color: var(--text-muted); font-weight: 600;">正確性</span>
+                            <span style="font-size: clamp(18px, 4.5vh, 26px); font-weight: 800; color: var(--color-danger); margin-top: 4px;" id="pk-submitted-chung-acc">0.0</span>
+                        </div>
+                        <!-- 青方 表現性 -->
+                        <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: clamp(6px, 1.2vh, 12px) 0; display: flex; flex-direction: column; align-items: center;">
+                            <span style="font-size: clamp(11px, 2vh, 14px); color: var(--text-muted); font-weight: 600;">表現性</span>
+                            <span style="font-size: clamp(18px, 4.5vh, 26px); font-weight: 800; color: var(--color-info); margin-top: 4px;" id="pk-submitted-chung-pres">0.0</span>
+                        </div>
+                        <!-- 青方 總分 -->
+                        <div class="overlay-score-subbox" style="flex: 1; background: rgba(0, 204, 255, 0.08); border: 1px solid rgba(0, 204, 255, 0.2); border-radius: 12px; padding: clamp(6px, 1.2vh, 12px) 0; display: flex; flex-direction: column; align-items: center; box-shadow: 0 0 15px rgba(0, 204, 255, 0.15);">
+                            <span style="font-size: clamp(11px, 2vh, 14px); color: #fff; font-weight: 700; text-shadow: 0 0 5px rgba(255,255,255,0.2);">送出總分</span>
+                            <span style="font-size: clamp(18px, 4.5vh, 26px); font-weight: 900; color: var(--color-info); margin-top: 4px;" id="pk-submitted-chung-total">0.0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 紅方送出分數總覽 -->
+                <div style="text-align: left; width: 100%; margin-bottom: 20px;">
+                    <div style="font-size: clamp(13px, 2.2vh, 16px); color: var(--color-danger); font-weight: 800; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                        <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: var(--color-danger);"></span>
+                        紅方分數
+                    </div>
+                    <div class="overlay-scores-container" style="display: flex; gap: clamp(8px, 1.5vw, 16px); justify-content: center; width: 100%;">
+                        <!-- 紅方 正確性 -->
+                        <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: clamp(6px, 1.2vh, 12px) 0; display: flex; flex-direction: column; align-items: center;">
+                            <span style="font-size: clamp(11px, 2vh, 14px); color: var(--text-muted); font-weight: 600;">正確性</span>
+                            <span style="font-size: clamp(18px, 4.5vh, 26px); font-weight: 800; color: var(--color-danger); margin-top: 4px;" id="pk-submitted-hong-acc">0.0</span>
+                        </div>
+                        <!-- 紅方 表現性 -->
+                        <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: clamp(6px, 1.2vh, 12px) 0; display: flex; flex-direction: column; align-items: center;">
+                            <span style="font-size: clamp(11px, 2vh, 14px); color: var(--text-muted); font-weight: 600;">表現性</span>
+                            <span style="font-size: clamp(18px, 4.5vh, 26px); font-weight: 800; color: var(--color-info); margin-top: 4px;" id="pk-submitted-hong-pres">0.0</span>
+                        </div>
+                        <!-- 紅方 總分 -->
+                        <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 51, 102, 0.08); border: 1px solid rgba(255, 51, 102, 0.2); border-radius: 12px; padding: clamp(6px, 1.2vh, 12px) 0; display: flex; flex-direction: column; align-items: center; box-shadow: 0 0 15px rgba(255, 51, 102, 0.15);">
+                            <span style="font-size: clamp(11px, 2vh, 14px); color: #fff; font-weight: 700; text-shadow: 0 0 5px rgba(255,255,255,0.2);">送出總分</span>
+                            <span style="font-size: clamp(18px, 4.5vh, 26px); font-weight: 900; color: var(--color-danger); margin-top: 4px;" id="pk-submitted-hong-total">0.0</span>
+                        </div>
+                    </div>
+                </div>
+                <button id="pk-btn-modify-score" class="btn-modify-score" onclick="pkModifyScore()">
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" style="margin-right: 6px; vertical-align: middle;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    修改分數
+                </button>
+            </div>
+        </div>
+
+    </div><!-- end pk-scoring-screen -->
+
+    <!-- PK 正確性快速評分 Modal（青方） -->
+    <div id="pk-quick-acc-chung-modal" class="confirm-modal-overlay hidden">
+        <div class="quick-modal-card">
+            <div class="quick-modal-header">
+                <h2 style="color: var(--color-info);">🔵 青方 — 正確性快速評分</h2>
+                <div class="quick-header-actions">
+                    <button class="btn-quick-cancel" onclick="pkCancelQuickAcc('chung')">取消</button>
+                    <button class="btn-quick-confirm" onclick="pkConfirmQuickAcc('chung')">確定</button>
+                </div>
+            </div>
+            <div class="quick-score-grid" id="pk-quick-acc-chung-grid"></div>
+        </div>
+    </div>
+
+    <!-- PK 正確性快速評分 Modal（紅方） -->
+    <div id="pk-quick-acc-hong-modal" class="confirm-modal-overlay hidden">
+        <div class="quick-modal-card">
+            <div class="quick-modal-header">
+                <h2 style="color: var(--color-danger);">🔴 紅方 — 正確性快速評分</h2>
+                <div class="quick-header-actions">
+                    <button class="btn-quick-cancel" onclick="pkCancelQuickAcc('hong')">取消</button>
+                    <button class="btn-quick-confirm" onclick="pkConfirmQuickAcc('hong')">確定</button>
+                </div>
+            </div>
+            <div class="quick-score-grid" id="pk-quick-acc-hong-grid"></div>
+        </div>
+    </div>
+
+    <!-- PK 表現性快速評分 Modal（青方） -->
+    <div id="pk-quick-pres-chung-modal" class="confirm-modal-overlay hidden">
+        <div class="quick-modal-card wide-modal-card">
+            <div class="quick-modal-header">
+                <h2 style="color: var(--color-info);">🔵 青方 — 表現性快速評分</h2>
+                <div class="quick-header-actions">
+                    <button class="btn-quick-cancel" onclick="pkCancelQuickPres('chung')">取消</button>
+                    <button class="btn-quick-confirm" onclick="pkConfirmQuickPres('chung')">確定</button>
+                </div>
+            </div>
+            <div class="quick-pres-modal-body" id="pk-quick-pres-chung-body">
+                <div class="quick-pres-section">
+                    <div class="quick-pres-section-title">速度與力量 (目前: <span id="pk-chung-quick-p1-current">2.0</span>)</div>
+                    <div class="quick-score-grid" id="pk-chung-quick-p1-grid"></div>
+                </div>
+                <div class="quick-pres-section">
+                    <div class="quick-pres-section-title">節奏與協調 (目前: <span id="pk-chung-quick-p2-current">2.0</span>)</div>
+                    <div class="quick-score-grid" id="pk-chung-quick-p2-grid"></div>
+                </div>
+                <div class="quick-pres-section">
+                    <div class="quick-pres-section-title">精神表現 (目前: <span id="pk-chung-quick-p3-current">2.0</span>)</div>
+                    <div class="quick-score-grid" id="pk-chung-quick-p3-grid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PK 表現性快速評分 Modal（紅方） -->
+    <div id="pk-quick-pres-hong-modal" class="confirm-modal-overlay hidden">
+        <div class="quick-modal-card wide-modal-card">
+            <div class="quick-modal-header">
+                <h2 style="color: var(--color-danger);">🔴 紅方 — 表現性快速評分</h2>
+                <div class="quick-header-actions">
+                    <button class="btn-quick-cancel" onclick="pkCancelQuickPres('hong')">取消</button>
+                    <button class="btn-quick-confirm" onclick="pkConfirmQuickPres('hong')">確定</button>
+                </div>
+            </div>
+            <div class="quick-pres-modal-body" id="pk-quick-pres-hong-body">
+                <div class="quick-pres-section">
+                    <div class="quick-pres-section-title">速度與力量 (目前: <span id="pk-hong-quick-p1-current">2.0</span>)</div>
+                    <div class="quick-score-grid" id="pk-hong-quick-p1-grid"></div>
+                </div>
+                <div class="quick-pres-section">
+                    <div class="quick-pres-section-title">節奏與協調 (目前: <span id="pk-hong-quick-p2-current">2.0</span>)</div>
+                    <div class="quick-score-grid" id="pk-hong-quick-p2-grid"></div>
+                </div>
+                <div class="quick-pres-section">
+                    <div class="quick-pres-section-title">精神表現 (目前: <span id="pk-hong-quick-p3-current">2.0</span>)</div>
+                    <div class="quick-score-grid" id="pk-hong-quick-p3-grid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. 豎屏提示覆蓋層 (當裝置為直向時顯示) -->
+    <div id="portrait-warning" class="portrait-warning-screen">
+        <div class="warning-icon">
+            <svg viewBox="0 0 24 24" width="64" height="64" stroke="var(--color-warning)" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" class="rotate-phone-animation">
+                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                <line x1="12" y1="18" x2="12.01" y2="18"></line>
+            </svg>
+        </div>
+        <h2>請旋轉您的裝置</h2>
+        <p>品勢評分系統需於橫向螢幕（Landscape）下使用</p>
+    </div>
+
+    <!-- 自訂確認退出連線 Modal -->
+    <div id="confirm-modal" class="confirm-modal-overlay hidden">
+        <div class="confirm-modal-card">
+            <div class="confirm-modal-icon">
+                <svg viewBox="0 0 24 24" width="48" height="48" stroke="var(--color-warning)" stroke-width="2.5" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <h2>確定要退出連線嗎？</h2>
+            <p>退出連線後將會返回登入畫面，且目前的評分頁面會被關閉。</p>
+            <div class="confirm-modal-actions">
+                <button class="btn-modal-cancel" onclick="closeResetModal()">取消</button>
+                <button class="btn-modal-confirm" onclick="executeExit()">確定退出</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 正確性快速評分 Modal -->
+    <div id="quick-acc-modal" class="confirm-modal-overlay hidden">
+        <div class="quick-modal-card">
+            <div class="quick-modal-header">
+                <h2>正確性快速評分 (0.0 ~ 4.0)</h2>
+                <div class="quick-header-actions">
+                    <button class="btn-quick-cancel" onclick="cancelQuickAcc()">取消</button>
+                    <button class="btn-quick-confirm" onclick="confirmQuickAcc()">確定</button>
+                </div>
+            </div>
+            <div class="quick-score-grid" id="quick-acc-grid">
+                <!-- JS 動態生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 表現性快速評分 Modal -->
+    <div id="quick-pres-modal" class="confirm-modal-overlay hidden">
+        <div class="quick-modal-card wide-modal-card">
+            <div class="quick-modal-header">
+                <h2>表現性快速評分</h2>
+                <div class="quick-header-actions">
+                    <button class="btn-quick-cancel" onclick="cancelQuickPres()">取消</button>
+                    <button class="btn-quick-confirm" onclick="confirmQuickPres()">確定</button>
+                </div>
+            </div>
+            <div class="quick-pres-modal-body">
+                <div class="quick-pres-section">
+                    <div class="quick-pres-section-title">速度與力量 (目前: <span id="quick-p1-current">2.0</span>)</div>
+                    <div class="quick-score-grid" id="quick-p1-grid">
+                        <!-- JS 動態生成 -->
+                    </div>
+                </div>
+                <div class="quick-pres-section">
+                    <div class="quick-pres-section-title">節奏與協調 (目前: <span id="quick-p2-current">2.0</span>)</div>
+                    <div class="quick-score-grid" id="quick-p2-grid">
+                        <!-- JS 動態生成 -->
+                    </div>
+                </div>
+                <div class="quick-pres-section">
+                    <div class="quick-pres-section-title">精神表現 (目前: <span id="quick-p3-current">2.0</span>)</div>
+                    <div class="quick-score-grid" id="quick-p3-grid">
+                        <!-- JS 動態生成 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 載入邏輯控制 JS -->
+    <script src="{{ url_for('static', filename='main.js') }}?v=6.2"></script>
+</body>
+</html>
