@@ -148,6 +148,7 @@ class LicenseGeneratorGUI:
             "licensee": licensee,
             "machine_id": machine_id,
             "expire_date": expire_date,
+            "issue_date": datetime.now().strftime("%Y-%m-%d"),
             "authorized_modules": modules
         }
         

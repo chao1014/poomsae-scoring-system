@@ -26,3 +26,6 @@ cloudflared.exe
 
 # Temporary files
 temp_update/
+
+# Archives
+*.zip

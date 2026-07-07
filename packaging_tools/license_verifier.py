@@ -131,6 +131,16 @@ def verify_license_data(lic_data, current_machine_id, module_name):
     except ValueError:
         return False, "INVALID_DATE_FORMAT", "過期日期格式有誤 (必須為 YYYY-MM-DD)"
 
+    # 6. 驗證簽發時間（防止將時間調到簽發之前）
+    # 向下相容：若無 issue_date 欄位，預設為 "2026-01-01"
+    issue_date_str = lic_data.get("issue_date", "2026-01-01")
+    try:
+        issue_date = datetime.strptime(issue_date_str, "%Y-%m-%d").date()
+        if today < issue_date:
+            return False, "TIME_TRAVEL_BACKWARD_BEFORE_ISSUE", f"系統時間異常，不得早於授權簽發日期 {issue_date_str}"
+    except ValueError:
+        return False, "INVALID_ISSUE_DATE_FORMAT", "授權簽發日期格式有誤 (必須為 YYYY-MM-DD)"
+
     return True, "SUCCESS", lic_data
 
 def get_license_path():
@@ -162,7 +172,7 @@ def get_license_path():
 
 def load_and_verify(module_name):
     """
-    載入並驗證授權檔案。
+    載入並驗證授權檔案，以及校驗「最後執行時間」防篡改。
     回傳: (is_valid, error_code, detail, current_machine_id)
     """
     current_machine_id = generate_machine_id()
@@ -178,7 +188,46 @@ def load_and_verify(module_name):
         return False, "LOAD_FAILED", f"讀取授權檔失敗: {str(e)}", current_machine_id
 
     is_valid, err_code, detail = verify_license_data(lic_data, current_machine_id, module_name)
-    return is_valid, err_code, detail, current_machine_id
+    if not is_valid:
+        return False, err_code, detail, current_machine_id
+
+    # 授權基本驗證通過後，開始「最後執行時間」的校驗
+    sys_time_path = os.path.join(os.path.dirname(lic_path), ".sys_time.dat")
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    
+    if os.path.exists(sys_time_path):
+        try:
+            with open(sys_time_path, 'r', encoding='utf-8') as f:
+                time_data = json.load(f)
+                
+            # 驗證時間檔的簽章
+            expected_sig = calculate_signature(time_data)
+            if not hmac.compare_digest(time_data.get("signature", ""), expected_sig):
+                return False, "TIME_RECORD_TAMPERED", "系統時間紀錄檔已被竄改", current_machine_id
+                
+            last_run_str = time_data.get("last_run", "")
+            last_run = datetime.strptime(last_run_str, "%Y-%m-%d").date()
+            today = datetime.now().date()
+            
+            if today < last_run:
+                return False, "TIME_TRAVEL_BACKWARD", f"系統偵測到本機時間異常，目前時間不得早於上次使用時間 ({last_run_str})", current_machine_id
+                
+        except Exception as e:
+            return False, "TIME_RECORD_ERROR", f"校驗時間紀錄檔時出錯: {str(e)}", current_machine_id
+            
+    # 驗證都通過，或者檔案不存在（首次運行），則更新/建立時間紀錄檔
+    try:
+        new_time_data = {
+            "last_run": today_str
+        }
+        new_time_data["signature"] = calculate_signature(new_time_data)
+        with open(sys_time_path, 'w', encoding='utf-8') as f:
+            json.dump(new_time_data, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        # 寫入失敗可能是權限問題，但不該因此阻擋使用者開啟
+        print(f"寫入時間紀錄檔失敗: {e}")
+
+    return True, "SUCCESS", detail, current_machine_id
 
 def check_and_enforce(module_name):
     """

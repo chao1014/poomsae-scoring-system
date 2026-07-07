@@ -12,6 +12,88 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # 品勢�
 PACKAGING_DIR = os.path.join(BASE_DIR, "packaging_tools")
 BUILD_DIR = os.path.join(BASE_DIR, "build")
 DIST_DIR = os.path.join(BASE_DIR, "dist")
+POOMSAE_SYSTEM_DIR = os.path.join(DIST_DIR, "PoomsaeScoringSystem")
+BACKUP_DIR = os.path.join(BASE_DIR, "build_backup_temp")
+
+def backup_poomsae_data():
+    """備份現有的授權、設定檔與比賽資料庫"""
+    if not os.path.exists(BACKUP_DIR):
+        os.makedirs(BACKUP_DIR)
+    
+    backed_up = []
+    
+    # 1. 備份檔案 (相容新舊路徑)
+    files_to_backup = ["license.lic", ".sys_time.dat", "settings.json", "ngrok_config.json"]
+    
+    # 自動搜尋並備份所有同級目錄下的 .db 檔
+    db_files = []
+    if os.path.exists(POOMSAE_SYSTEM_DIR):
+        for item in os.listdir(POOMSAE_SYSTEM_DIR):
+            if item.endswith(".db"):
+                db_files.append((os.path.join(POOMSAE_SYSTEM_DIR, item), item))
+    if os.path.exists(DIST_DIR):
+        for item in os.listdir(DIST_DIR):
+            if item.endswith(".db") and item != "dist.zip":
+                db_files.append((os.path.join(DIST_DIR, item), item))
+                
+    # 備份檔案
+    for filename in files_to_backup:
+        src_file_new = os.path.join(POOMSAE_SYSTEM_DIR, filename)
+        src_file_old = os.path.join(DIST_DIR, filename)
+        
+        src_file = None
+        if os.path.exists(src_file_new):
+            src_file = src_file_new
+        elif os.path.exists(src_file_old):
+            src_file = src_file_old
+            
+        if src_file:
+            try:
+                shutil.copy2(src_file, os.path.join(BACKUP_DIR, filename))
+                backed_up.append(filename)
+            except Exception as e:
+                print(f"  - [WARN] 備份 {filename} 失敗: {e}")
+                
+    # 備份資料庫
+    for db_path, db_name in db_files:
+        try:
+            shutil.copy2(db_path, os.path.join(BACKUP_DIR, db_name))
+            backed_up.append(db_name)
+        except Exception as e:
+            print(f"  - [WARN] 備份資料庫 {db_name} 失敗: {e}")
+            
+    if backed_up:
+        print(f"  - 已自動備份關鍵資料: {', '.join(set(backed_up))}")
+
+def restore_poomsae_data():
+    """還原備份的關鍵資料"""
+    if not os.path.exists(BACKUP_DIR):
+        return
+    
+    restored = []
+    os.makedirs(POOMSAE_SYSTEM_DIR, exist_ok=True)
+    
+    # 遍歷暫存區內的所有檔案進行還原
+    for item in os.listdir(BACKUP_DIR):
+        src_path = os.path.join(BACKUP_DIR, item)
+        if os.path.isfile(src_path):
+            try:
+                dst_path = os.path.join(POOMSAE_SYSTEM_DIR, item)
+                if os.path.exists(dst_path):
+                    os.remove(dst_path)
+                shutil.copy2(src_path, dst_path)
+                restored.append(item)
+            except Exception as e:
+                print(f"  - [WARN] 還原 {item} 失敗: {e}")
+                
+    if restored:
+        print(f"  - 已自動還原關鍵資料: {', '.join(restored)}")
+        
+    # 清理備份資料夾
+    try:
+        shutil.rmtree(BACKUP_DIR)
+    except Exception:
+        pass
 
 def install_requirements():
     """檢查並安裝 PyInstaller 與 PyArmor"""
@@ -168,12 +250,12 @@ def run_pyinstaller(script_name, exe_name, is_gui=False):
         print(f"  - [WARN] 系統將自動降級為標準 PyInstaller 安全打包流程...")
         use_obfuscated = False
 
-    # 2. 設定打包源檔案與命令 (使用 --onefile 模式)
+    # 2. 設定打包源檔案與命令 (使用 --onedir 模式)
     cmd = [
         "pyinstaller",
         "--clean",
         "-y",
-        "--onefile",
+        "--onedir",
         "--paths", BASE_DIR,
         "--specpath", PACKAGING_DIR,
         "--workpath", BUILD_DIR,
@@ -212,41 +294,37 @@ def run_pyinstaller(script_name, exe_name, is_gui=False):
         return False
 
 def copy_config_files():
-    """複製 Ngrok 設定檔範本到 dist/ 目錄，以便使用者直接修改"""
-    print("[*] 正在複製設定檔範本到 dist 目錄...")
+    """複製 Ngrok 設定檔與 settings 到發布目錄"""
+    print("[*] 正在複製設定檔與 settings...")
+    os.makedirs(POOMSAE_SYSTEM_DIR, exist_ok=True)
     
-    # 確保發布目錄存在
-    if not os.path.exists(DIST_DIR):
-        os.makedirs(DIST_DIR, exist_ok=True)
-
     # 1. 同步 ngrok_config.json
     config_src = os.path.join(BASE_DIR, "ngrok_config.json")
+    config_dst = os.path.join(POOMSAE_SYSTEM_DIR, "ngrok_config.json")
     if os.path.exists(config_src):
-        config_dst = os.path.join(DIST_DIR, "ngrok_config.json")
         shutil.copy2(config_src, config_dst)
-        print("  - 設定檔 ngrok_config.json 已成功複製到 dist 目錄。")
+        print("  - 設定檔 ngrok_config.json 已成功複製到發布目錄。")
     else:
         # 如果不存在，建立一個預設範本
         default_config = {
             "auth_token": "請在此填寫您的_Auth_Token",
             "domain": "請在此填寫您的_固定網域.ngrok-free.dev"
         }
-        config_dst = os.path.join(DIST_DIR, "ngrok_config.json")
         try:
             with open(config_dst, 'w', encoding='utf-8') as f:
                 json.dump(default_config, f, indent=4, ensure_ascii=False)
-            print("  - 已在 dist 目錄下產生預設 ngrok_config.json 檔案。")
+            print("  - 已在發布目錄下產生預設 ngrok_config.json 檔案。")
         except Exception as e:
             print(f"  - [WARN] 產生 ngrok_config.json 失敗: {e}")
 
     # 2. 智慧合併 settings.json（保留使用者已有設定，補上開發端新增欄位）
     settings_src = os.path.join(BASE_DIR, "settings.json")
-    settings_dst = os.path.join(DIST_DIR, "settings.json")
+    settings_dst = os.path.join(POOMSAE_SYSTEM_DIR, "settings.json")
     try:
         with open(settings_src, 'r', encoding='utf-8') as f:
             src_settings = json.load(f)
 
-        # 若 dist/ 已有 settings.json，以使用者設定為主，僅補上缺少的欄位
+        # 若已存在，以使用者設定為主，僅補上缺少的欄位
         if os.path.exists(settings_dst):
             with open(settings_dst, 'r', encoding='utf-8') as f:
                 dst_settings = json.load(f)
@@ -275,6 +353,10 @@ def main():
     print("==========================================")
     
     install_requirements()
+    
+    # 備份現有的設定、授權與比賽資料庫
+    backup_poomsae_data()
+    
     clean_previous_builds()
     
     # 打包主程式 app.py 為 PoomsaeScoringSystem.exe (保留命令提示字元控制台，is_gui=False)
@@ -282,12 +364,17 @@ def main():
             
     if success:
         copy_config_files()
+        
+        # 還原關鍵資料
+        restore_poomsae_data()
+        
         print("\n==========================================")
         print(f"[OK] 打包流程結束！成功生成品勢計分系統執行檔。")
-        print(f"    最終發布檔案位於: {DIST_DIR}/PoomsaeScoringSystem.exe")
-        print(f"    請注意：執行時必須將 license.lic 放在該執行檔同級目錄下。")
+        print(f"    最終發布檔案位於: {POOMSAE_SYSTEM_DIR}")
         print("==========================================")
     else:
+        # 即使打包失敗也還原
+        restore_poomsae_data()
         print("\n[ERR] 打包失敗，未成功生成程式。")
 
 if __name__ == "__main__":
