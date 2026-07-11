@@ -110,61 +110,128 @@ body {
    ========================================== */
 .brand-header {
     text-align: center;
-    margin-top: clamp(1vh, 2vh, 4vh);
-    margin-bottom: clamp(1vh, 2vh, 4vh);
+    margin-top: clamp(2vh, 4vh, 6vh);
+    margin-bottom: clamp(2vh, 4vh, 6vh);
+    position: relative;
+    z-index: 10;
 }
 
 .logo-placeholder {
-    width: clamp(40px, 9vh, 80px);
-    height: clamp(40px, 9vh, 80px);
-    margin: 0 auto clamp(5px, 1.2vh, 12px) auto;
-    filter: drop-shadow(0 0 15px rgba(142, 88, 255, 0.4));
-    animation: pulse 3s infinite ease-in-out;
+    width: clamp(50px, 12vh, 100px);
+    height: clamp(50px, 12vh, 100px);
+    margin: 0 auto clamp(10px, 2vh, 20px) auto;
+    filter: drop-shadow(0 0 20px rgba(142, 88, 255, 0.6));
+    animation: floatGlow 4s ease-in-out infinite;
+    display: block;
+}
+
+@keyframes floatGlow {
+    0% { transform: translateY(0px); filter: drop-shadow(0 0 15px rgba(142, 88, 255, 0.4)); }
+    50% { transform: translateY(-10px); filter: drop-shadow(0 0 25px rgba(0, 204, 255, 0.7)); }
+    100% { transform: translateY(0px); filter: drop-shadow(0 0 15px rgba(142, 88, 255, 0.4)); }
 }
 
 .brand-header h1 {
-    font-size: var(--font-size-title);
-    font-weight: 800;
-    margin: 0 0 4px 0;
-    background: linear-gradient(135deg, #ffffff 0%, #a385ff 100%);
+    font-size: clamp(24px, 5vh, 36px);
+    font-weight: 900;
+    margin: 0 0 8px 0;
+    background: linear-gradient(135deg, #ffffff 0%, #a385ff 50%, #00ccff 100%);
+    background-size: 200% auto;
     -webkit-background-clip: text;
-    background-clip: text; /* 補上標準屬性以獲得相容性 */
+    background-clip: text;
     -webkit-text-fill-color: transparent;
-    letter-spacing: 1.5px;
+    letter-spacing: 2px;
+    animation: gradientShift 5s ease infinite;
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
 }
 
 .brand-header p {
-    font-size: var(--font-size-body);
+    font-size: clamp(14px, 2.5vh, 18px);
     color: var(--text-muted);
     margin: 0;
+    letter-spacing: 1px;
 }
 
 .judge-grid {
     display: grid;
-    grid-template-columns: repeat(7, 1fr); /* 一律改為 7 欄，排成一排 */
-    gap: var(--gap-layout);
-    margin-bottom: clamp(8px, 2.5vh, 24px);
+    grid-template-columns: repeat(7, 1fr);
+    gap: clamp(10px, 2vw, 20px);
+    margin-bottom: clamp(16px, 4vh, 32px);
+    padding: 0 clamp(10px, 2vw, 30px);
+    position: relative;
+    z-index: 10;
 }
 
 .btn-judge-select {
-    background: var(--bg-panel);
-    border: 1.5px solid var(--bg-panel-border);
-    border-radius: 12px;
+    background: rgba(22, 15, 38, 0.4);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(142, 88, 255, 0.2);
+    border-radius: 16px;
     color: var(--text-main);
     font-family: var(--font-outfit);
-    font-size: clamp(14px, 3vh, 24px);
-    font-weight: 700;
-    padding: clamp(16px, 4vh, 32px) 0; /* 加大高度，讓按鈕看起來更長一些，更便於手指點選 */
+    font-size: clamp(16px, 3.5vh, 28px);
+    font-weight: 800;
+    padding: clamp(20px, 5vh, 40px) 0;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-judge-select::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 50%; height: 100%;
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transform: skewX(-20deg);
+    transition: 0.5s;
+}
+
+.btn-judge-select:hover::before {
+    left: 200%;
+}
+
+.btn-judge-select:hover {
+    transform: translateY(-5px);
+    background: rgba(142, 88, 255, 0.15);
+    border-color: rgba(142, 88, 255, 0.5);
+    box-shadow: 0 15px 35px rgba(142, 88, 255, 0.3), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+    color: #fff;
 }
 
 .btn-judge-select:active {
-    transform: scale(0.92);
+    transform: translateY(2px) scale(0.95);
     background: var(--color-primary);
     border-color: var(--color-primary);
-    box-shadow: 0 0 20px rgba(142, 88, 255, 0.6);
+    box-shadow: 0 0 25px rgba(142, 88, 255, 0.8);
+}
+
+.btn-judge-select.connected {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.2);
+    pointer-events: none;
+    box-shadow: none;
+}
+.btn-judge-select.connected::before {
+    display: none;
+}
+.btn-judge-select.connected::after {
+    content: '已連線';
+    display: block;
+    font-size: clamp(10px, 2vh, 14px);
+    font-weight: 600;
+    margin-top: 4px;
+    color: var(--color-success);
+    opacity: 0.7;
 }
 
 .custom-login-container {
@@ -222,23 +289,19 @@ input[type="text"]:focus {
 }
 
 /* ==========================================
-   2. 等待畫面 (Waiting Screen)
+   2. 等待畫面 (Waiting Screen) — 沉穩專業風格
    ========================================== */
 .waiting-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: clamp(10px, 3vh, 30px);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+    padding-bottom: clamp(10px, 2vh, 20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.badge {
-    background: var(--color-primary);
-    padding: clamp(3px, 0.8vh, 8px) clamp(10px, 1.5vw, 20px);
-    border-radius: 20px;
-    font-weight: 700;
-    font-size: var(--font-size-body);
-    letter-spacing: 0.5px;
-}
 
 .connection-status {
     font-size: var(--font-size-body);
@@ -246,74 +309,151 @@ input[type="text"]:focus {
     display: flex;
     align-items: center;
     gap: 8px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
 }
 
 .pulse-dot {
-    width: clamp(6px, 1.2vh, 10px);
-    height: clamp(6px, 1.2vh, 10px);
+    width: clamp(7px, 1.3vh, 10px);
+    height: clamp(7px, 1.3vh, 10px);
     background-color: var(--color-success);
     border-radius: 50%;
     box-shadow: 0 0 8px var(--color-success);
-    animation: pulse 1.5s infinite ease-in-out;
+    animation: pulseGlow 2s infinite alternate ease-in-out;
 }
 
-.waiting-content {
-    text-align: center;
-    margin-top: clamp(2vh, 5vh, 10vh);
+@keyframes pulseGlow {
+    from { opacity: 0.5; transform: scale(0.85); }
+    to   { opacity: 1;   transform: scale(1.15); }
 }
 
-.waiting-content h2 {
-    font-size: var(--font-size-title);
-    font-weight: 700;
-    margin-top: clamp(10px, 3vh, 30px);
-}
-
-.waiting-content p {
-    color: var(--text-muted);
-    font-size: var(--font-size-body);
-    margin-top: 8px;
-}
-
-/* 等待載入動畫 */
-.loader {
-    position: relative;
-    width: clamp(60px, 14vh, 120px);
-    height: clamp(60px, 14vh, 120px);
-    margin: 0 auto;
+/* === 主體區塊 === */
+.waiting-body {
+    flex: 1;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
+    gap: clamp(20px, 4vh, 40px);
+    position: relative;
+    z-index: 10;
 }
 
-.loader .ring {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    border: 4px solid transparent;
-    border-radius: 50%;
-    animation: rotate-loader 2s linear infinite;
+/* === 裁判代號大卡 === */
+.waiting-judge-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(6px, 1.2vh, 12px);
 }
 
-.loader .ring:nth-child(1) {
-    border-top-color: var(--color-primary);
-    animation-delay: -0.5s;
-}
-
-.loader .ring:nth-child(2) {
-    border-top-color: var(--color-info);
-    animation-delay: -1s;
-}
-
-.loader .ring:nth-child(3) {
-    border-top-color: var(--color-success);
-}
-
-.loading-text {
-    font-size: clamp(9px, 1.8vh, 12px);
-    font-weight: 800;
+.waiting-judge-label {
+    font-size: clamp(13px, 2.2vh, 17px);
+    color: rgba(163, 156, 181, 0.7);
+    font-weight: 600;
     letter-spacing: 2px;
-    color: var(--text-muted);
-    animation: blink 1.5s infinite;
+    text-transform: uppercase;
+}
+
+.waiting-judge-id {
+    font-size: clamp(64px, 16vh, 128px);
+    font-weight: 900;
+    line-height: 1;
+    color: #ffffff;
+    letter-spacing: -2px;
+    font-variant-numeric: tabular-nums;
+    text-shadow:
+        0 0 40px rgba(142, 88, 255, 0.25),
+        0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+/* === 三點分隔 === */
+.waiting-divider {
+    display: flex;
+    align-items: center;
+    gap: clamp(8px, 1.5vw, 14px);
+}
+
+.waiting-divider-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.waiting-divider-dot:nth-child(2) {
+    background-color: rgba(142, 88, 255, 0.5);
+    width: 6px;
+    height: 6px;
+}
+
+/* === 狀態說明區塊 === */
+.waiting-status-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(6px, 1.2vh, 10px);
+    text-align: center;
+}
+
+/* 時鐘圖示已移除 */
+
+.waiting-status-text {
+    font-size: clamp(18px, 3.5vh, 26px);
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.85);
+    margin: 0;
+    letter-spacing: 0.5px;
+}
+
+.waiting-status-sub {
+    font-size: clamp(13px, 2.2vh, 16px);
+    color: rgba(163, 156, 181, 0.6);
+    margin: 0;
+    letter-spacing: 0.2px;
+}
+
+/* === 賽事資訊卡（兩列式） === */
+.waiting-info-card {
+    width: clamp(260px, 55vw, 480px);
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.waiting-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: clamp(14px, 2.5vh, 22px) clamp(20px, 4vw, 32px);
+    gap: clamp(12px, 2vw, 24px);
+}
+
+.waiting-info-sep {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.06);
+    margin: 0 clamp(16px, 3vw, 28px);
+}
+
+.waiting-info-label {
+    font-size: clamp(13px, 2.2vh, 16px);
+    color: rgba(163, 156, 181, 0.6);
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.waiting-info-value {
+    font-size: clamp(15px, 2.8vh, 20px);
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.9);
+    letter-spacing: 0.2px;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* ==========================================

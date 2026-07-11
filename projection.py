@@ -1189,8 +1189,14 @@ class ProjectionWindow(tk.Toplevel):
                     self.canvas.itemconfigure(bg_id, state="normal")
                     self.canvas.itemconfigure(rank_rect_id, state="normal")
                     
-                    # 初始化該行的背景色為預設暗底色與暗邊框（如果是閃爍行，閃爍定時器會再去改它）
-                    self.canvas.itemconfigure(bg_id, fill="#05143a", outline="#0a225c")
+                    # 初始化該行的背景色：若是閃爍行，根據目前閃爍狀態著色；否則設為預設暗色
+                    if idx == self.flash_row_idx:
+                        if getattr(self, 'flash_state', False):
+                            self.canvas.itemconfigure(bg_id, fill="#122c6e", outline="#ffff00")
+                        else:
+                            self.canvas.itemconfigure(bg_id, fill="#05143a", outline="#0a225c")
+                    else:
+                        self.canvas.itemconfigure(bg_id, fill="#05143a", outline="#0a225c")
                     
                     data_idx = start_idx + idx
                     if data_idx < len(leaderboard):
@@ -1300,6 +1306,8 @@ class ProjectionWindow(tk.Toplevel):
 
     def update_data(self, info_text="", player_text="", team_text="", score_text="-"):
         """相容舊的 update_data 呼召，直接導向 refresh"""
+        if self.current_score_slide != 0 and info_text not in ["", "score_slide_show"]:
+            self.stop_score_slide_show()
         self.status_text = info_text
         self.refresh()
 
@@ -1324,8 +1332,30 @@ class ProjectionWindow(tk.Toplevel):
             return gui.get_final_score(uid, mdata)
         return 0.0
 
+    def emit_slide_changed(self):
+        try:
+            import web_server
+            ld_data = self.query_leaderboard_data() if self.current_score_slide == 3 else []
+            gui = self.main_gui if (hasattr(self, 'main_gui') and self.main_gui) else globals().get('gui')
+            ld_title = ""
+            if gui and gui.current_match_data:
+                ld_title = " / ".join([str(gui.current_match_data.get(k, "")) for k in ["Category", "Division", "Phase"] if gui.current_match_data.get(k, "")])
+                
+            flash_idx = getattr(self, 'flash_row_idx', -1)
+            slide_data = {
+                'slide': self.current_score_slide,
+                'leaderboard': ld_data,
+                'leaderboard_title': ld_title,
+                'flash_row_idx': flash_idx
+            }
+            current_state['projection_slide_data'] = slide_data
+            web_server.socketio.emit('projection_slide_changed', slide_data, namespace='/')
+        except Exception as e:
+            print(f"Failed to emit projection_slide_changed: {e}")
+
     def start_score_slide_show(self):
         self.stop_score_slide_show()
+        self.emit_slide_changed()
         duration = int(system_settings.get("slide_duration", 3)) * 1000
         self.score_slide_timer_id = self.after(duration, self.next_score_slide)
         
@@ -1334,6 +1364,8 @@ class ProjectionWindow(tk.Toplevel):
             try: self.after_cancel(self.score_slide_timer_id)
             except: pass
         self.score_slide_timer_id = None
+        self.current_score_slide = 0
+        self.emit_slide_changed()
         
     def next_score_slide(self):
         if not self.winfo_exists(): return
@@ -1350,6 +1382,7 @@ class ProjectionWindow(tk.Toplevel):
             self.current_score_slide = available_slides[0]
             
         self.refresh()
+        self.emit_slide_changed()
         
         if gui:
             gui.last_proj_score_slide = self.current_score_slide

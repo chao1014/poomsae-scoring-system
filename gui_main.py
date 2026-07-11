@@ -81,19 +81,22 @@ class PoomsaeReplicaGUI:
                            "raw_total_score", "raw_total_score_0", "raw_total_score_1"]:
                     mdata.pop(k, None)
 
-    def query_leaderboard_data(self):
+    def query_leaderboard_data(self, cat=None, div=None, phase=None, round_num=None):
         """從資料庫與快取中載入並計算目前組別所有完賽選手的排行榜資料，支援 WT 同分打破與並列名次"""
-        if not self.current_match_data: return []
-        
-        current_cat = self.current_match_data.get("Category", "")
-        current_div = self.current_match_data.get("Division", "")
-        current_phase = self.current_match_data.get("Phase", "")
-        
-        # 篩選同組完賽選手
-        try:
-            rounds = int(self.current_match_data.get("Round", 2))
-        except:
-            rounds = 2
+        if cat is not None and div is not None and phase is not None:
+            current_cat = cat
+            current_div = div
+            current_phase = phase
+            rounds = round_num if round_num is not None else 2
+        else:
+            if not self.current_match_data: return []
+            current_cat = self.current_match_data.get("Category", "")
+            current_div = self.current_match_data.get("Division", "")
+            current_phase = self.current_match_data.get("Phase", "")
+            try:
+                rounds = int(self.current_match_data.get("Round", 2))
+            except:
+                rounds = 2
 
         group_players = []
         for uid, mdata in self.imported_matches.items():
@@ -2394,8 +2397,22 @@ class PoomsaeReplicaGUI:
                         database.clear_match_scores(iid)
                     except Exception as db_err:
                         print(f"清除資料庫分數失敗: {db_err}")
+                    if hasattr(self, 'temp_scores_to_save') and self.temp_scores_to_save:
+                        for r_num in list(self.temp_scores_to_save.keys()):
+                            self.temp_scores_to_save[r_num] = [
+                                s for s in self.temp_scores_to_save[r_num] if s.get('match_uuid') != iid
+                            ]
+                    if hasattr(config, 'current_state') and config.current_state.get('temp_scores'):
+                        for r_num in list(config.current_state['temp_scores'].keys()):
+                            config.current_state['temp_scores'][r_num] = [
+                                s for s in config.current_state['temp_scores'][r_num] if s.get('match_uuid') != iid
+                            ]
+                    self.invalidate_leaderboard_cache(uid=iid)
                     data["Status"] = "Ready"
-                    data.pop("final_score", None)
+                    for k in ["final_score", "final_score_0", "final_score_1",
+                              "presentation_score", "presentation_score_0", "presentation_score_1",
+                              "raw_total_score", "raw_total_score_0", "raw_total_score_1"]:
+                        data.pop(k, None)
                     self.update_tree_columns()
                     try:
                         self.export_match_log(auto_open=False)
@@ -2768,6 +2785,7 @@ class PoomsaeReplicaGUI:
         def calc_rank_and_stop():
             rank_val = "-"
             try:
+                self.invalidate_leaderboard_cache(uid=self.current_match_uuid)
                 leaderboard = self.query_leaderboard_data()
                 for item in leaderboard:
                     if item["name"] == _player_name:
@@ -3018,6 +3036,9 @@ class PoomsaeReplicaGUI:
                 result_status = "Withdraw"
             else:
                 result_status = "" if is_withdraw else "End"
+                
+            if is_withdraw or status_val != "End":
+                end_time_str = ""
             
             # 3. 欄位資料
             court = str(data.get("Court", ""))
@@ -3080,7 +3101,7 @@ class PoomsaeReplicaGUI:
 <td colspan='8' style='height: 5px'></td>
 </tr><tr>
 <td>{court}</td>
-<td>{no},{no}</td>
+<td>{no}</td>
 <td>{game_method}</td>
 <td>{game_type}</td>
 <td>{category}</td>
@@ -3224,9 +3245,6 @@ class PoomsaeReplicaGUI:
                 else:
                     html_block += "<tr>" + "<td></td>"*7 + "<td></td></tr>"
                     html_block += "<tr>" + "<td></td>"*7 + "<td></td></tr>"
-                    
-                html_block += "<tr>" + "<td></td>"*7 + "<td></td></tr>"
-                html_block += "<tr>" + "<td></td>"*7 + "<td></td></tr>"
                 
                 # 計算排名或勝利者
                 rank_or_winner = ""
@@ -3253,7 +3271,7 @@ class PoomsaeReplicaGUI:
                     # 一般賽制排名
                     rank_val = "-"
                     try:
-                        leaderboard = self.query_leaderboard_data()
+                        leaderboard = self.query_leaderboard_data(cat=data.get("Category"), div=data.get("Division"), phase=data.get("Phase"))
                         for item in leaderboard:
                             if item["name"] == c_name:
                                 rank_val = str(item.get("rank", "-"))
@@ -3267,7 +3285,7 @@ class PoomsaeReplicaGUI:
                 html_block = html_block.replace("__RANK_OR_WINNER__", "")
                 
             def append_to_file(path):
-                header_template = f"<!DOCTYPE html><html><head><meta charset='UTF-8'><title>LOG</title><style>table {{table-layout: fixed; width: 100%; border-collapse: collapse;}} td {{height: 20px; text-align: center; word-wrap: break-word;}}</style></head><body>\n<h1 style='text-align: center; border-top: 2px solid #888; border-bottom: 2px solid #888; height: 50px; line-height: 50px;'> GAME RESULT </h1>\n<p style='text-align: right; '> TIME : {log_time_str}</p>\n<table style='width: 100%;border-spacing: 0px; font-size: 13px;' border='1'>\n<tr>\n<td style='width: 12%;'>Court</td>\n<td style='width: 12%;'>No.</td>\n<td style='width: 12%;'>Game method</td>\n<td style='width: 12%;'>Type</td>\n<td style='width: 12%;'>Category</td>\n<td style='width: 12%;'>Division</td>\n<td style='width: 12%;'>Phase</td>\n<td style='width: 16%;'>End Time</td>\n</tr><tr>\n<td>Noc (Chung)</td>\n<td>Team (Chung)</td>\n<td>Name (Chung)</td>\n<td>Noc (Hong)</td>\n<td>Team (Hong)</td>\n<td>Name (Hong)</td>\n<td>Result</td>\n<td></td>\n</tr><tr>\n<td>*1R (Chung) (A/ P/ D/ Avg/ Tot)</td>\n<td>*2R (Chung) (A/ P/ D/ Avg/ Tot)</td>\n<td>**Total (Chung) (A/ P/ D/ Avg/ Tot)</td>\n<td>*1R (Hong) (A/ P/ D/ Avg/ Tot)</td>\n<td>*2R (Hong) (A/ P/ D/ Avg/ Tot)</td>\n<td>**Total (Hong) (A/ P/ D/ Avg/ Tot)</td>\n<td></td>\n<td></td>\n</tr><tr>\n<td>1R J1(Chung)</td>\n<td>1R J2(Chung)</td>\n<td>1R J3(Chung)</td>\n<td>1R J4(Chung)</td>\n<td>1R J5(Chung)</td>\n<td>1R J6(Chung)</td>\n<td>1R J7(Chung)</td>\n<td></td>\n</tr><tr>\n<td>2R J1(Chung)</td>\n<td>2R J2(Chung)</td>\n<td>2R J3(Chung)</td>\n<td>2R J4(Chung)</td>\n<td>2R J5(Chung)</td>\n<td>2R J6(Chung)</td>\n<td>2R J7(Chung)</td>\n<td></td>\n</tr><tr>\n<td>1R J1(Hong)</td>\n<td>1R J2(Hong)</td>\n<td>1R J3(Hong)</td>\n<td>1R J4(Hong)</td>\n<td>1R J5(Hong)</td>\n<td>1R J6(Hong)</td>\n<td>1R J7(Hong)</td>\n<td></td>\n</tr><tr>\n<td>2R J1(Hong)</td>\n<td>2R J2(Hong)</td>\n<td>2R J3(Hong)</td>\n<td>2R J4(Hong)</td>\n<td>2R J5(Hong)</td>\n<td>2R J6(Hong)</td>\n<td>2R J7(Hong)</td>\n<td></td>\n</tr><tr>\n<td colspan='8' style='height: 5px'></td>\n</tr>\n"
+                header_template = f"<!DOCTYPE html><html><head><meta charset='UTF-8'><title>LOG</title><style>table {{table-layout: fixed; width: 100%; border-collapse: collapse;}} td {{height: 20px; text-align: center; word-wrap: break-word;}}</style></head><body>\n<h1 style='text-align: center; border-top: 2px solid #888; border-bottom: 2px solid #888; height: 50px; line-height: 50px;'> GAME RESULT </h1>\n<p style='text-align: right; '> TIME : {log_time_str}</p>\n<table style='width: 100%;border-spacing: 0px; font-size: 13px;' border='1'>\n<tr>\n<td style='width: 13%;'>Court</td>\n<td style='width: 13%;'>No.</td>\n<td style='width: 13%;'>Game method</td>\n<td style='width: 13%;'>Type</td>\n<td style='width: 13%;'>Category</td>\n<td style='width: 13%;'>Division</td>\n<td style='width: 13%;'>Phase</td>\n<td style='width: 9%;'>End Time</td>\n</tr><tr>\n<td>Noc (Chung)</td>\n<td>Team (Chung)</td>\n<td>Name (Chung)</td>\n<td>Noc (Hong)</td>\n<td>Team (Hong)</td>\n<td>Name (Hong)</td>\n<td>Result</td>\n<td></td>\n</tr><tr>\n<td>*1R (Chung) (A/ P/ D/ Avg/ Tot)</td>\n<td>*2R (Chung) (A/ P/ D/ Avg/ Tot)</td>\n<td>**Total (Chung) (A/ P/ D/ Avg/ Tot)</td>\n<td>*1R (Hong) (A/ P/ D/ Avg/ Tot)</td>\n<td>*2R (Hong) (A/ P/ D/ Avg/ Tot)</td>\n<td>**Total (Hong) (A/ P/ D/ Avg/ Tot)</td>\n<td></td>\n<td></td>\n</tr><tr>\n<td>1R J1(Chung)</td>\n<td>1R J2(Chung)</td>\n<td>1R J3(Chung)</td>\n<td>1R J4(Chung)</td>\n<td>1R J5(Chung)</td>\n<td>1R J6(Chung)</td>\n<td>1R J7(Chung)</td>\n<td></td>\n</tr><tr>\n<td>2R J1(Chung)</td>\n<td>2R J2(Chung)</td>\n<td>2R J3(Chung)</td>\n<td>2R J4(Chung)</td>\n<td>2R J5(Chung)</td>\n<td>2R J6(Chung)</td>\n<td>2R J7(Chung)</td>\n<td></td>\n</tr><tr>\n<td>1R J1(Hong)</td>\n<td>1R J2(Hong)</td>\n<td>1R J3(Hong)</td>\n<td>1R J4(Hong)</td>\n<td>1R J5(Hong)</td>\n<td>1R J6(Hong)</td>\n<td>1R J7(Hong)</td>\n<td></td>\n</tr><tr>\n<td>2R J1(Hong)</td>\n<td>2R J2(Hong)</td>\n<td>2R J3(Hong)</td>\n<td>2R J4(Hong)</td>\n<td>2R J5(Hong)</td>\n<td>2R J6(Hong)</td>\n<td>2R J7(Hong)</td>\n<td></td>\n</tr><tr>\n<td colspan='8' style='height: 5px'></td>\n</tr>\n"
                 if os.path.exists(path):
                     try:
                         with open(path, 'r', encoding='utf-8') as f:
@@ -3622,14 +3640,16 @@ class PoomsaeReplicaGUI:
                 # 直接從一次性撈取的字典中拿取，無須再連接 SQLite
                 rows = scores_by_uid.get(uid, [])
             
-            is_withdraw = len(rows) == 0
             status_val = mdata.get("Status", "")
+            if status_val != "End" and status_val != "Withdraw":
+                rows = []
+            is_withdraw = (len(rows) == 0)
             if status_val == "End":
                 result_status = "End"
             elif status_val == "Withdraw":
                 result_status = "Withdraw"
             else:
-                result_status = "" if is_withdraw else "End"
+                result_status = ""
             
             court = str(mdata.get("Court", ""))
             no = str(mdata.get("No", ""))
@@ -3689,24 +3709,25 @@ class PoomsaeReplicaGUI:
                 return avg_acc, avg_pres, total_raw
 
             end_time_str = ""
-            if rows and len(rows[0]) > 9 and rows[0][9]:
-                try:
-                    ts_str = rows[0][9]
-                    if isinstance(ts_str, str):
-                        dt = datetime.strptime(ts_str.split(".")[0], "%Y-%m-%d %H:%M:%S")
-                    else:
-                        dt = ts_str
-                    end_time_str = dt.strftime("%Y%m%d%H%M%S")
-                except:
+            if status_val == "End" and not is_withdraw:
+                if rows and len(rows[0]) > 9 and rows[0][9]:
+                    try:
+                        ts_str = rows[0][9]
+                        if isinstance(ts_str, str):
+                            dt = datetime.strptime(ts_str.split(".")[0], "%Y-%m-%d %H:%M:%S")
+                        else:
+                            dt = ts_str
+                        end_time_str = dt.strftime("%Y%m%d%H%M%S")
+                    except:
+                        end_time_str = datetime.now().strftime("%Y%m%d%H%M%S")
+                else:
                     end_time_str = datetime.now().strftime("%Y%m%d%H%M%S")
-            else:
-                end_time_str = datetime.now().strftime("%Y%m%d%H%M%S")
                 
             html_block = f"""<tr>
 <td colspan='8' style='height: 5px'></td>
 </tr><tr>
 <td>{court}</td>
-<td>{no},{no}</td>
+<td>{no}</td>
 <td>{game_method}</td>
 <td>{game_type}</td>
 <td>{category}</td>
@@ -3847,9 +3868,6 @@ class PoomsaeReplicaGUI:
                 else:
                     html_block += "<tr>" + "<td></td>"*7 + "<td></td></tr>"
                     html_block += "<tr>" + "<td></td>"*7 + "<td></td></tr>"
-                    
-                html_block += "<tr>" + "<td></td>"*7 + "<td></td></tr>"
-                html_block += "<tr>" + "<td></td>"*7 + "<td></td></tr>"
                 
             pk_winner = ""
             if is_pk and not is_withdraw:
@@ -3947,7 +3965,7 @@ class PoomsaeReplicaGUI:
         all_html_blocks = "".join([item["html"] for item in detailed_list])
         
         log_time_str = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
-        header_template = f"<!DOCTYPE html><html><head><meta charset='UTF-8'><title>LOG</title><style>table {{table-layout: fixed; width: 100%; border-collapse: collapse;}} td {{height: 20px; text-align: center; word-wrap: break-word;}}</style></head><body>\n<h1 style='text-align: center; border-top: 2px solid #888; border-bottom: 2px solid #888; height: 50px; line-height: 50px;'> GAME RESULT </h1>\n<p style='text-align: right; '> TIME : {log_time_str}</p>\n<table style='width: 100%;border-spacing: 0px; font-size: 13px;' border='1'>\n<tr>\n<td style='width: 12%;'>Court</td>\n<td style='width: 12%;'>No.</td>\n<td style='width: 12%;'>Game method</td>\n<td style='width: 12%;'>Type</td>\n<td style='width: 12%;'>Category</td>\n<td style='width: 12%;'>Division</td>\n<td style='width: 12%;'>Phase</td>\n<td style='width: 16%;'>End Time</td>\n</tr><tr>\n<td>Noc (Chung)</td>\n<td>Team (Chung)</td>\n<td>Name (Chung)</td>\n<td>Noc (Hong)</td>\n<td>Team (Hong)</td>\n<td>Name (Hong)</td>\n<td>Result</td>\n<td></td>\n</tr><tr>\n<td>*1R (Chung) (A/ P/ D/ Avg/ Tot)</td>\n<td>*2R (Chung) (A/ P/ D/ Avg/ Tot)</td>\n<td>**Total (Chung) (A/ P/ D/ Avg/ Tot)</td>\n<td>*1R (Hong) (A/ P/ D/ Avg/ Tot)</td>\n<td>*2R (Hong) (A/ P/ D/ Avg/ Tot)</td>\n<td>**Total (Hong) (A/ P/ D/ Avg/ Tot)</td>\n<td></td>\n<td></td>\n</tr><tr>\n<td>1R J1(Chung)</td>\n<td>1R J2(Chung)</td>\n<td>1R J3(Chung)</td>\n<td>1R J4(Chung)</td>\n<td>1R J5(Chung)</td>\n<td>1R J6(Chung)</td>\n<td>1R J7(Chung)</td>\n<td></td>\n</tr><tr>\n<td>2R J1(Chung)</td>\n<td>2R J2(Chung)</td>\n<td>2R J3(Chung)</td>\n<td>2R J4(Chung)</td>\n<td>2R J5(Chung)</td>\n<td>2R J6(Chung)</td>\n<td>2R J7(Chung)</td>\n<td></td>\n</tr><tr>\n<td>1R J1(Hong)</td>\n<td>1R J2(Hong)</td>\n<td>1R J3(Hong)</td>\n<td>1R J4(Hong)</td>\n<td>1R J5(Hong)</td>\n<td>1R J6(Hong)</td>\n<td>1R J7(Hong)</td>\n<td></td>\n</tr><tr>\n<td>2R J1(Hong)</td>\n<td>2R J2(Hong)</td>\n<td>2R J3(Hong)</td>\n<td>2R J4(Hong)</td>\n<td>2R J5(Hong)</td>\n<td>2R J6(Hong)</td>\n<td>2R J7(Hong)</td>\n<td></td>\n</tr><tr>\n<td colspan='8' style='height: 5px'></td>\n</tr>\n"
+        header_template = f"<!DOCTYPE html><html><head><meta charset='UTF-8'><title>LOG</title><style>table {{table-layout: fixed; width: 100%; border-collapse: collapse;}} td {{height: 20px; text-align: center; word-wrap: break-word;}}</style></head><body>\n<h1 style='text-align: center; border-top: 2px solid #888; border-bottom: 2px solid #888; height: 50px; line-height: 50px;'> GAME RESULT </h1>\n<p style='text-align: right; '> TIME : {log_time_str}</p>\n<table style='width: 100%;border-spacing: 0px; font-size: 13px;' border='1'>\n<tr>\n<td style='width: 13%;'>Court</td>\n<td style='width: 13%;'>No.</td>\n<td style='width: 13%;'>Game method</td>\n<td style='width: 13%;'>Type</td>\n<td style='width: 13%;'>Category</td>\n<td style='width: 13%;'>Division</td>\n<td style='width: 13%;'>Phase</td>\n<td style='width: 9%;'>End Time</td>\n</tr><tr>\n<td>Noc (Chung)</td>\n<td>Team (Chung)</td>\n<td>Name (Chung)</td>\n<td>Noc (Hong)</td>\n<td>Team (Hong)</td>\n<td>Name (Hong)</td>\n<td>Result</td>\n<td></td>\n</tr><tr>\n<td>*1R (Chung) (A/ P/ D/ Avg/ Tot)</td>\n<td>*2R (Chung) (A/ P/ D/ Avg/ Tot)</td>\n<td>**Total (Chung) (A/ P/ D/ Avg/ Tot)</td>\n<td>*1R (Hong) (A/ P/ D/ Avg/ Tot)</td>\n<td>*2R (Hong) (A/ P/ D/ Avg/ Tot)</td>\n<td>**Total (Hong) (A/ P/ D/ Avg/ Tot)</td>\n<td></td>\n<td></td>\n</tr><tr>\n<td>1R J1(Chung)</td>\n<td>1R J2(Chung)</td>\n<td>1R J3(Chung)</td>\n<td>1R J4(Chung)</td>\n<td>1R J5(Chung)</td>\n<td>1R J6(Chung)</td>\n<td>1R J7(Chung)</td>\n<td></td>\n</tr><tr>\n<td>2R J1(Chung)</td>\n<td>2R J2(Chung)</td>\n<td>2R J3(Chung)</td>\n<td>2R J4(Chung)</td>\n<td>2R J5(Chung)</td>\n<td>2R J6(Chung)</td>\n<td>2R J7(Chung)</td>\n<td></td>\n</tr><tr>\n<td>1R J1(Hong)</td>\n<td>1R J2(Hong)</td>\n<td>1R J3(Hong)</td>\n<td>1R J4(Hong)</td>\n<td>1R J5(Hong)</td>\n<td>1R J6(Hong)</td>\n<td>1R J7(Hong)</td>\n<td></td>\n</tr><tr>\n<td>2R J1(Hong)</td>\n<td>2R J2(Hong)</td>\n<td>2R J3(Hong)</td>\n<td>2R J4(Hong)</td>\n<td>2R J5(Hong)</td>\n<td>2R J6(Hong)</td>\n<td>2R J7(Hong)</td>\n<td></td>\n</tr><tr>\n<td colspan='8' style='height: 5px'></td>\n</tr>\n"
         
         import os
         os.makedirs("match_logs", exist_ok=True)
@@ -4219,7 +4237,7 @@ class PoomsaeReplicaGUI:
             c = conn.cursor()
             try:
                 c.execute("""
-                    SELECT round, accuracy, presentation, deduction, total
+                    SELECT round, judge_id, accuracy, presentation, deduction, total
                     FROM scores
                     WHERE match_uuid = ? AND player_side = ?
                 """, (uid, player_side))
@@ -4227,12 +4245,30 @@ class PoomsaeReplicaGUI:
             except Exception:
                 # 舊資料庫相容：如果無 deduction 欄位則不讀取，且 total 欄位用 (accuracy + presentation) 計算
                 c.execute("""
-                    SELECT round, accuracy, presentation, 0.0, (accuracy + presentation)
+                    SELECT round, judge_id, accuracy, presentation, 0.0, (accuracy + presentation)
                     FROM scores
                     WHERE match_uuid = ? AND player_side = ?
                 """, (uid, player_side))
                 rows = c.fetchall()
             conn.close()
+            
+            temp_scores = config.current_state.get('temp_scores', getattr(self, 'temp_scores_to_save', {}))
+            if temp_scores:
+                existing_keys = {(row[0], str(row[1])) for row in rows}
+                for r_num, scores_list in temp_scores.items():
+                    for s in scores_list:
+                        if s.get('match_uuid') == uid and s.get('player_side', 0) == player_side:
+                            key = (s.get('round_num'), str(s.get('judge_id')))
+                            if key not in existing_keys:
+                                rows.append((
+                                    s.get('round_num'),
+                                    s.get('judge_id'),
+                                    s.get('acc', 0.0),
+                                    s.get('pres', 0.0),
+                                    s.get('deduction', 0.0),
+                                    s.get('total', 0.0)
+                                ))
+                                existing_keys.add(key)
             
             if not rows:
                 return (0.0, 0.0, 0.0)
@@ -4241,10 +4277,10 @@ class PoomsaeReplicaGUI:
             raw_sum_total = 0.0
             for row in rows:
                 r_num = row[0]
-                acc = row[1]
-                pres = row[2]
-                ded = row[3] if len(row) > 3 else 0.0
-                total = row[4] if len(row) > 4 else (acc + pres)
+                acc = row[2]
+                pres = row[3]
+                ded = row[4] if len(row) > 4 else 0.0
+                total = row[5] if len(row) > 5 else (acc + pres)
                 
                 raw_sum_total += total
                 

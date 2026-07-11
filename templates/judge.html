@@ -33,6 +33,15 @@
         </div>
 
         <div class="brand-header">
+            <svg class="logo-placeholder" viewBox="0 0 24 24" fill="none" stroke="url(#logo-grad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <defs>
+                    <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#8e58ff" />
+                        <stop offset="100%" stop-color="#00ccff" />
+                    </linearGradient>
+                </defs>
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
             <h1>品勢裁判評分端</h1>
             <p>請點選您的裁判代號以開始連線</p>
         </div>
@@ -50,53 +59,64 @@
 
         <!-- 保留隱藏的 input 以供自動登入與 J1~J7 快速選擇按鈕的讀寫邏輯 -->
         <input type="hidden" id="judge-id">
+        <!-- 保留隱藏 span 供 JS 寫入裁判代號 (display-judge-id) -->
+        <span id="display-judge-id" style="display:none;"></span>
 
     </div>
 
     <!-- 2. 等待畫面 -->
     <div id="waiting-screen" class="screen hidden">
+        <!-- 頂部操作列：只保留連線狀態與全螢幕 -->
         <div class="waiting-header">
-            <!-- 左側群組：目前裁判、切換裁判、連線狀態 -->
-            <div style="display: flex; align-items: center; gap: clamp(10px, 2vw, 20px);">
-                <div class="badge">裁判: <span id="display-judge-id"></span></div>
-                <button class="btn-change-judge" onclick="changeJudge()">切換裁判</button>
-                <div class="connection-status" id="connection-status-text">
-                    <span class="pulse-dot" style="background-color: var(--color-warning); box-shadow: 0 0 8px var(--color-warning);"></span>
-                    連線中...
-                </div>
+            <button class="btn-change-judge" onclick="changeJudge()" style="font-size: clamp(12px, 2vh, 15px);">切換裁判</button>
+            <div class="connection-status" id="connection-status-text">
+                <span class="pulse-dot" style="background-color: var(--color-warning); box-shadow: 0 0 8px var(--color-warning);"></span>
+                連線中...
             </div>
-            
-            <!-- 右側：全螢幕按鈕 -->
             <button class="btn-change-judge" onclick="toggleFullscreen()" title="切換全螢幕" style="padding: 6px 10px; margin: 0;">
                 <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" style="vertical-align: middle;">
                     <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
                 </svg>
             </button>
         </div>
-        
-        <div class="waiting-content">
-            <div class="loader">
-                <div class="ring"></div>
-                <div class="ring"></div>
-                <div class="ring"></div>
-                <span class="loading-text">WAITING</span>
+
+
+        <!-- 主體內容 -->
+        <div class="waiting-body">
+            <!-- 裁判身份卡 -->
+            <div class="waiting-judge-card">
+                <span class="waiting-judge-label">您目前的裁判代號</span>
+                <span class="waiting-judge-id" id="waiting-display-judge-id-large">--</span>
             </div>
-            <h2>等待主控台載入選手</h2>
-            <p>選手載入後，系統將自動跳轉至評分介面</p>
-            
-            <!-- 賽事與場地連線資訊 -->
-            <div class="waiting-match-info">
-                <div class="info-item">
-                    <span class="lbl">當前賽事</span>
-                    <span class="val" id="waiting-tournament-name">載入中...</span>
+
+            <!-- 分隔線 -->
+            <div class="waiting-divider">
+                <span class="waiting-divider-dot"></span>
+                <span class="waiting-divider-dot"></span>
+                <span class="waiting-divider-dot"></span>
+            </div>
+
+            <!-- 狀態訊息（無圖示） -->
+            <div class="waiting-status-block">
+                <p class="waiting-status-text">等候主控台分配賽事</p>
+                <p class="waiting-status-sub">主控台就緒後，系統將自動導向評分介面</p>
+            </div>
+
+            <!-- 賽事資訊卡：兩列式 -->
+            <div class="waiting-info-card">
+                <div class="waiting-info-row">
+                    <span class="waiting-info-label">連線場地</span>
+                    <span class="waiting-info-value" id="waiting-court-no">--</span>
                 </div>
-                <div class="info-item">
-                    <span class="lbl">連線場地</span>
-                    <span class="val" id="waiting-court-no">載入中...</span>
+                <div class="waiting-info-sep"></div>
+                <div class="waiting-info-row">
+                    <span class="waiting-info-label">當前賽事</span>
+                    <span class="waiting-info-value" id="waiting-tournament-name">載入中...</span>
                 </div>
             </div>
         </div>
     </div>
+
 
     <!-- 3. 評分主畫面 -->
     <div id="scoring-screen" class="screen hidden">
@@ -319,10 +339,10 @@
                 </div>
                 <div id="final-result-box" class="final-result-box hidden">
                     <div class="final-score-box">
-                        <span class="score-lbl">最終得分</span>
+                        <span class="score-lbl" id="final-result-title">最終得分</span>
                         <span class="score-val" id="final-val-score">0.00</span>
                     </div>
-                    <div class="final-rank-box">
+                    <div class="final-rank-box" id="final-rank-box">
                         <span class="score-lbl">目前排名</span>
                         <span class="score-val" id="final-val-rank">-</span>
                     </div>
@@ -767,7 +787,26 @@
         </div>
     </div>
 
-    <!-- 4. 豎屏提示覆蓋層 (當裝置為直向時顯示) -->
+    <!-- 4. 同步大螢幕排行榜畫面 -->
+    <style>
+        @keyframes flash-row-bg {
+            0%, 100% { background-color: #05143a; border-color: #0a225c; }
+            50% { background-color: #1a4a9c; border-color: #ffd700; }
+        }
+        .flashing-row {
+            animation: flash-row-bg 1s infinite;
+        }
+    </style>
+    <div id="ranking-screen" class="screen hidden" style="background-color: #000000; padding: 0; display: flex; flex-direction: column; overflow: hidden; align-items: stretch; justify-content: flex-start; z-index: 9999; position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh;">
+        <div style="height: 15vh; display: flex; align-items: center; justify-content: center;">
+            <h1 id="ranking-screen-title" style="font-family: 'Microsoft JhengHei', sans-serif; font-size: clamp(24px, 5vh, 48px); font-weight: bold; color: white; margin: 0; text-align: center;">目前賽事排行榜</h1>
+        </div>
+        <div id="ranking-tbody" style="flex: 1; display: flex; flex-direction: column; width: 100%; margin: 0; padding: 0; box-sizing: border-box; overflow-y: auto; overflow-x: hidden;">
+            <!-- JS 動態生成 -->
+        </div>
+    </div>
+
+    <!-- 5. 豎屏提示覆蓋層 (當裝置為直向時顯示) -->
     <div id="portrait-warning" class="portrait-warning-screen">
         <div class="warning-icon">
             <svg viewBox="0 0 24 24" width="64" height="64" stroke="var(--color-warning)" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" class="rotate-phone-animation">

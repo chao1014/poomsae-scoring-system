@@ -1,4 +1,4 @@
-const socket = io();
+﻿const socket = io();
 
 // 全域事件監聽 (除錯用)
 socket.onAny((event, ...args) => {
@@ -62,12 +62,29 @@ socket.on('status_update', (data) => {
     }
 });
 
+socket.on('connected_judges_update', (data) => {
+    const connected = data.connected || [];
+    const buttons = document.querySelectorAll('.btn-judge-select');
+    buttons.forEach(btn => {
+        const judgeId = btn.innerText.trim();
+        // 若該號碼已被連線且不是自己目前的身份，則設定為已連線狀態
+        if (connected.includes(judgeId) && judgeId !== myJudgeId) {
+            btn.classList.add('connected');
+            btn.disabled = true;
+        } else {
+            btn.classList.remove('connected');
+            btn.disabled = false;
+        }
+    });
+});
+
 let myJudgeId = "";
 let currentMode = 0; // 0: Cutoff, 1: PK, 2: Freestyle, 3: Quick
 let currentStage = 1;
 let hasSecondRound = false;
 let countdownInterval = null;
 let currentCountdownSec = 90;
+let screenBeforeLeaderboard = null;
 
 // 評分狀態變數 (公認品勢)
 let cntMinor = 0; // 小錯 -0.1 次數
@@ -198,6 +215,9 @@ function joinSystem(alreadyInitiated = false) {
     // 更新登入標記
     document.getElementById('display-judge-id').innerText = myJudgeId;
     document.getElementById('display-judge-id-live').innerText = myJudgeId;
+    const largeJudgeId = document.getElementById('waiting-display-judge-id-large');
+    if (largeJudgeId) largeJudgeId.innerText = myJudgeId;
+
     
     // 先切換畫面至等待頁面，避免 Socket 響應過快導致 UI 狀態競爭 (Race Condition)
     document.getElementById('login-screen').classList.add('hidden');
@@ -207,6 +227,8 @@ function joinSystem(alreadyInitiated = false) {
     if (pkScoringScreen) pkScoringScreen.classList.add('hidden');
     const pkSubmittedOverlay = document.getElementById('pk-submitted-overlay');
     if (pkSubmittedOverlay) pkSubmittedOverlay.classList.add('hidden');
+    const rankingScreen = document.getElementById('ranking-screen');
+    if (rankingScreen) rankingScreen.classList.add('hidden');
     
     document.getElementById('waiting-screen').classList.remove('hidden');
     
@@ -230,6 +252,8 @@ function changeJudge() {
     if (pkScoringScreen) pkScoringScreen.classList.add('hidden');
     const pkSubmittedOverlay = document.getElementById('pk-submitted-overlay');
     if (pkSubmittedOverlay) pkSubmittedOverlay.classList.add('hidden');
+    const rankingScreen = document.getElementById('ranking-screen');
+    if (rankingScreen) rankingScreen.classList.add('hidden');
     
     // 清除 PK 主題
     const ss = document.getElementById('scoring-screen');
@@ -445,6 +469,8 @@ socket.on('scoring_start', (data) => {
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('waiting-screen').classList.add('hidden');
         document.getElementById('pk-scoring-screen').classList.add('hidden');
+        const rankingScreen = document.getElementById('ranking-screen');
+        if (rankingScreen) rankingScreen.classList.add('hidden');
         document.getElementById('scoring-screen').classList.remove('hidden');
         
         // 確保 WakeLock 仍然有效
@@ -456,48 +482,35 @@ socket.on('scoring_start', (data) => {
 });
 
 // 停止評分廣播 (大螢幕展示分數，正式鎖定評分)
-socket.on('scoring_stop', (data) => {
+function applyStopScoringUI(data) {
     if (!myJudgeId) return;
     // 隱藏「修改分數」按鈕，正式鎖定不給修改
     const btnModify = document.getElementById('btn-modify-score');
-    if (btnModify) {
-        btnModify.classList.add('hidden');
-    }
+    if (btnModify) btnModify.classList.add('hidden');
     const pkBtnModify = document.getElementById('pk-btn-modify-score');
-    if (pkBtnModify) {
-        pkBtnModify.classList.add('hidden');
-    }
+    if (pkBtnModify) pkBtnModify.classList.add('hidden');
     
     // 隱藏原本的自評分數區
     const overlayScoreBox = document.querySelector('.overlay-scores-container');
-    if (overlayScoreBox) {
-        overlayScoreBox.classList.add('hidden');
-    }
+    if (overlayScoreBox) overlayScoreBox.classList.add('hidden');
     
     // 更改等待覆蓋層文字以提示裁判
     const overlayTitle = document.querySelector('#submitted-overlay h2');
-    if (overlayTitle) {
-        overlayTitle.innerText = "最終評分結果";
-    }
+    if (overlayTitle) overlayTitle.innerText = '最終評分結果';
     const overlayDesc = document.querySelector('#submitted-overlay p');
-    if (overlayDesc) {
-        overlayDesc.innerText = "評分已截止，以下為最終統計";
-    }
+    if (overlayDesc) overlayDesc.innerText = '評分已截止，以下為最終統計';
     
     const isPkSeq = data && data.is_pk_seq;
     const stage = data ? data.stage : 1;
     
     if (isPkSeq) {
-        // PK 交叉/依序上場模式：隱藏普通排名面板，顯示 PK 分數對決面板
+        // PK 交叉/依序上場模式
         const finalResultBox = document.getElementById('final-result-box');
         if (finalResultBox) finalResultBox.classList.add('hidden');
-        
         const pkResultBox = document.getElementById('pk-result-box');
         if (pkResultBox) pkResultBox.classList.remove('hidden');
         
         const pkScores = data.pk_scores || {};
-        
-        // 1. 填入 1R 分數
         const chungR1 = pkScores.chung_1r !== undefined ? pkScores.chung_1r : 0.0;
         const hongR1 = pkScores.hong_1r !== undefined ? pkScores.hong_1r : 0.0;
         const cR1El = document.getElementById('pk-res-chung-r1');
@@ -505,30 +518,25 @@ socket.on('scoring_stop', (data) => {
         if (cR1El) cR1El.innerText = chungR1.toFixed(2);
         if (hR1El) hR1El.innerText = hongR1.toFixed(2);
         
-        // 2. 判斷是否為 2R 結束
         const pkResR2Board = document.getElementById('pk-res-r2-board');
         if (stage === 2) {
             const chungR2 = pkScores.chung_2r !== undefined ? pkScores.chung_2r : 0.0;
             const hongR2 = pkScores.hong_2r !== undefined ? pkScores.hong_2r : 0.0;
             const chungFinal = pkScores.chung_final !== undefined ? pkScores.chung_final : 0.0;
             const hongFinal = pkScores.hong_final !== undefined ? pkScores.hong_final : 0.0;
-            
             const cR2El = document.getElementById('pk-res-chung-r2');
             const hR2El = document.getElementById('pk-res-hong-r2');
             const cFinEl = document.getElementById('pk-res-chung-final');
             const hFinEl = document.getElementById('pk-res-hong-final');
-            
             if (cR2El) cR2El.innerText = chungR2.toFixed(2);
             if (hR2El) hR2El.innerText = hongR2.toFixed(2);
             if (cFinEl) cFinEl.innerText = chungFinal.toFixed(3);
             if (hFinEl) hFinEl.innerText = hongFinal.toFixed(3);
-            
             if (pkResR2Board) pkResR2Board.classList.remove('hidden');
         } else {
             if (pkResR2Board) pkResR2Board.classList.add('hidden');
         }
         
-        // 3. 判斷是否該展示獲勝方 (2R賽事的2R結束，或1R賽事的1R結束)
         const isMatchFinished = (stage === 2) || (stage === 1 && !hasSecondRound);
         const winnerRow = document.getElementById('pk-res-winner-row');
         if (isMatchFinished) {
@@ -541,7 +549,6 @@ socket.on('scoring_stop', (data) => {
                 finalChung = chungR1;
                 finalHong = hongR1;
             }
-            
             const winEl = document.getElementById('pk-res-winner-text');
             if (winEl) {
                 if (finalChung > finalHong) {
@@ -566,24 +573,40 @@ socket.on('scoring_stop', (data) => {
         // 一般賽制，或 PK 同時上場模式
         const pkResultBox = document.getElementById('pk-result-box');
         if (pkResultBox) pkResultBox.classList.add('hidden');
-        
         const finalResultBox = document.getElementById('final-result-box');
-        if (finalResultBox) {
-            finalResultBox.classList.remove('hidden');
-        }
+        if (finalResultBox) finalResultBox.classList.remove('hidden');
         
         const finalValScore = document.getElementById('final-val-score');
         if (finalValScore && data && data.final_score !== undefined) {
-            finalValScore.innerText = parseFloat(data.final_score).toFixed(3); // 這裡修正為 3 位小數顯示，與大螢幕一致
+            finalValScore.innerText = parseFloat(data.final_score).toFixed(3);
         }
         
-        const finalValRank = document.getElementById('final-val-rank');
-        if (finalValRank && data && data.rank !== undefined) {
-            finalValRank.innerText = data.rank;
+        // 依照輪次調整標題與排名區塊
+        const finalResultTitle = document.getElementById('final-result-title');
+        const finalRankBox = document.getElementById('final-rank-box');
+        if (stage === 1 && hasSecondRound) {
+            if (finalResultTitle) finalResultTitle.innerText = '1R 評分結果';
+            if (finalRankBox) finalRankBox.classList.add('hidden');
+        } else {
+            if (finalResultTitle) finalResultTitle.innerText = '最終得分';
+            if (finalRankBox) finalRankBox.classList.remove('hidden');
+            const finalValRank = document.getElementById('final-val-rank');
+            if (finalValRank && data && data.rank !== undefined) {
+                finalValRank.innerText = data.rank;
+            }
         }
     }
     
     triggerVibrate(60);
+}
+
+socket.on('scoring_stop', (data) => {
+    applyStopScoringUI(data);
+});
+
+// 重連後本地還原最終結果畫面（由 reconnect_state 分支觸發）
+socket.on('_restore_stop_ui', (data) => {
+    applyStopScoringUI(data);
 });
 
 // 恢復評分廣播 (本輪重評)
@@ -598,6 +621,8 @@ socket.on('scoring_resume', () => {
     if (pkResultBox) {
         pkResultBox.classList.add('hidden');
     }
+    const rankingScreen = document.getElementById('ranking-screen');
+    if (rankingScreen) rankingScreen.classList.add('hidden');
     
     // 顯示「修改分數」按鈕
     const btnModify = document.getElementById('btn-modify-score');
@@ -951,11 +976,53 @@ socket.on('reconnect_state', (data) => {
                     document.getElementById('pk-submitted-overlay').classList.add('hidden');
                 }
             } else {
-                // 如果不是評分狀態，切換至等待載入畫面
-                document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('scoring-screen').classList.add('hidden');
-                document.getElementById('pk-scoring-screen').classList.add('hidden');
-                document.getElementById('waiting-screen').classList.remove('hidden');
+                // 非評分狀態：判斷是否應還原最終結果畫面（scoring_stop 已觸發且裁判曾送出分數）
+                const lastStop = data.last_stop_data;
+                const wasStopped = !!lastStop && (data.submitted || data.chung_submitted || data.hong_submitted);
+
+                if (wasStopped) {
+                    // 還原最終結果畫面：切換到正確的評分畫面，並觸發一次 scoring_stop 的 UI 還原
+                    document.getElementById('login-screen').classList.add('hidden');
+                    document.getElementById('waiting-screen').classList.add('hidden');
+
+                    if (currentMode === 1 && pkSeqMode === 0) {
+                        pkScoringScreen.classList.remove('hidden');
+                        scoringScreen.classList.add('hidden');
+                        // 還原 PK 已送出覆蓋層
+                        const chung = pkCalcSideScore('chung');
+                        const hong  = pkCalcSideScore('hong');
+                        document.getElementById('pk-submitted-chung-total').innerText = chung.total.toFixed(1);
+                        document.getElementById('pk-submitted-chung-acc').innerText = chung.acc.toFixed(1);
+                        document.getElementById('pk-submitted-chung-pres').innerText = chung.pres.toFixed(1);
+                        document.getElementById('pk-submitted-hong-total').innerText = hong.total.toFixed(1);
+                        document.getElementById('pk-submitted-hong-acc').innerText = hong.acc.toFixed(1);
+                        document.getElementById('pk-submitted-hong-pres').innerText = hong.pres.toFixed(1);
+                        document.getElementById('pk-submitted-overlay').classList.remove('hidden');
+                    } else {
+                        scoringScreen.classList.remove('hidden');
+                        pkScoringScreen.classList.add('hidden');
+                        // 還原已送出覆蓋層
+                        document.getElementById('submitted-overlay').classList.remove('hidden');
+                        document.getElementById('btn-modify-score').classList.add('hidden');
+                    }
+
+                    // 觸發 scoring_stop UI 還原：隱藏自評區、顯示最終結果
+                    const overlayScoreBox = document.querySelector('.overlay-scores-container');
+                    if (overlayScoreBox) overlayScoreBox.classList.add('hidden');
+                    const overlayTitle = document.querySelector('#submitted-overlay h2');
+                    if (overlayTitle) overlayTitle.innerText = '最終評分結果';
+                    const overlayDesc = document.querySelector('#submitted-overlay p');
+                    if (overlayDesc) overlayDesc.innerText = '評分已截止，以下為最終統計';
+
+                    // 發送一個偽 scoring_stop 事件給本地的 UI 邏輯
+                    applyStopScoringUI(lastStop);
+                } else {
+                    // 確實是等待中：顯示等待畫面
+                    document.getElementById('login-screen').classList.add('hidden');
+                    document.getElementById('scoring-screen').classList.add('hidden');
+                    document.getElementById('pk-scoring-screen').classList.add('hidden');
+                    document.getElementById('waiting-screen').classList.remove('hidden');
+                }
             }
 
             // 5. 還原倒數時間與計時器顯示
@@ -998,6 +1065,8 @@ socket.on('reconnect_state', (data) => {
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('scoring-screen').classList.add('hidden');
         document.getElementById('pk-scoring-screen').classList.add('hidden');
+        const rankingScreen = document.getElementById('ranking-screen');
+        if (rankingScreen) rankingScreen.classList.add('hidden');
         document.getElementById('waiting-screen').classList.remove('hidden');
     });
 
@@ -1646,6 +1715,7 @@ function highlightPresTempButtons() {
             buttons.forEach(btn => {
                 const btnScore = parseFloat(btn.dataset.score);
                 if (btnScore === curVal) {
+
                     btn.classList.add('selected');
                 } else {
                     btn.classList.remove('selected');
@@ -1696,6 +1766,89 @@ window.addEventListener('load', () => {
         }
     }
 });
+
+// 大螢幕投影片切換監聽 (同步排行榜)
+// Keep the exact visible state while the leaderboard is displayed.
+function applyProjectionSlide(data) {
+    if (!myJudgeId || !data) return;
+
+    const rankingScreen = document.getElementById('ranking-screen');
+    const loginScreen = document.getElementById('login-screen');
+    const scoringScreen = document.getElementById('scoring-screen');
+    const waitingScreen = document.getElementById('waiting-screen');
+    const pkScoringScreen = document.getElementById('pk-scoring-screen');
+    const submittedOverlay = document.getElementById('submitted-overlay');
+    const pkSubmittedOverlay = document.getElementById('pk-submitted-overlay');
+
+    if (data.slide === 3) {
+        if (!screenBeforeLeaderboard) {
+            const isVisible = (element) => element && !element.classList.contains('hidden');
+            screenBeforeLeaderboard = {
+                login: isVisible(loginScreen), waiting: isVisible(waitingScreen),
+                scoring: isVisible(scoringScreen), pkScoring: isVisible(pkScoringScreen),
+                submitted: isVisible(submittedOverlay), pkSubmitted: isVisible(pkSubmittedOverlay)
+            };
+        }
+        if (scoringScreen) scoringScreen.classList.add('hidden');
+        if (pkScoringScreen) pkScoringScreen.classList.add('hidden');
+        if (submittedOverlay) submittedOverlay.classList.add('hidden');
+        if (pkSubmittedOverlay) pkSubmittedOverlay.classList.add('hidden');
+        if (waitingScreen) waitingScreen.classList.add('hidden');
+
+        const titleEl = document.getElementById('ranking-screen-title');
+        if (titleEl && data.leaderboard_title) titleEl.innerText = data.leaderboard_title;
+        const tbody = document.getElementById('ranking-tbody');
+        if (tbody && Array.isArray(data.leaderboard)) {
+            tbody.replaceChildren();
+            data.leaderboard.forEach((player, index) => {
+                const isFlashing = data.flash_row_idx === index;
+                const row = document.createElement('div');
+                row.style.cssText = 'height:calc(85vh / 8 - 4px);min-height:60px;background-color:#05143a;border:1px solid #0a225c;margin:2px 0;position:relative;display:flex;align-items:center;box-sizing:border-box;width:100%;';
+                if (isFlashing) row.classList.add('flashing-row');
+                let displayScore = Number(player.score);
+                displayScore = Number.isFinite(displayScore) ? displayScore.toFixed(3) : '-';
+                if (displayScore === '10.000') displayScore = '10.00';
+                const textColor = isFlashing ? '#ffff00' : '#ffffff';
+
+                const rankBadge = document.createElement('div');
+                rankBadge.style.cssText = 'position:absolute;left:0;top:0;bottom:0;width:10%;max-width:80px;background-color:#0056cc;clip-path:polygon(0 0,100% 0,75% 100%,0 100%);display:flex;align-items:center;justify-content:center;padding-right:2%;';
+                const rankText = document.createElement('span');
+                rankText.style.cssText = `color:${textColor};font-family:'Microsoft JhengHei',sans-serif;font-weight:bold;font-size:clamp(16px,3.5vh,28px);z-index:1;`;
+                rankText.textContent = player.rank ?? '-';
+                rankBadge.appendChild(rankText);
+
+                const name = document.createElement('div');
+                name.style.cssText = 'margin-left:12%;margin-right:2%;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;';
+                const nameText = document.createElement('span');
+                nameText.style.cssText = `color:${textColor};font-family:'Microsoft JhengHei',sans-serif;font-weight:bold;font-size:clamp(16px,3.5vh,28px);`;
+                nameText.textContent = player.team ? `${player.name ?? ''} - ${player.team}` : (player.name ?? '');
+                name.appendChild(nameText);
+
+                const score = document.createElement('div');
+                score.style.cssText = `margin-right:2%;color:${textColor};font-family:'Microsoft JhengHei',sans-serif;font-weight:bold;font-size:clamp(20px,4.5vh,36px);`;
+                score.textContent = displayScore;
+                row.append(rankBadge, name, score);
+                tbody.appendChild(row);
+            });
+        }
+        if (rankingScreen) rankingScreen.classList.remove('hidden');
+    } else if (rankingScreen && !rankingScreen.classList.contains('hidden')) {
+        rankingScreen.classList.add('hidden');
+        const previous = screenBeforeLeaderboard;
+        if (previous) {
+            const setVisible = (element, visible) => { if (element) element.classList.toggle('hidden', !visible); };
+            setVisible(loginScreen, previous.login);
+            setVisible(waitingScreen, previous.waiting);
+            setVisible(scoringScreen, previous.scoring);
+            setVisible(pkScoringScreen, previous.pkScoring);
+            setVisible(submittedOverlay, previous.submitted);
+            setVisible(pkSubmittedOverlay, previous.pkSubmitted);
+        }
+        screenBeforeLeaderboard = null;
+    }
+}
+
+socket.on('projection_slide_changed', applyProjectionSlide);
 
 // ==========================================
 // 8. 倒數計時器邏輯 (Countdown Timer Logic)
@@ -1964,6 +2117,8 @@ function showPkScoringScreen(data) {
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('waiting-screen').classList.add('hidden');
     document.getElementById('scoring-screen').classList.add('hidden');
+    const rankingScreen = document.getElementById('ranking-screen');
+    if (rankingScreen) rankingScreen.classList.add('hidden');
     document.getElementById('pk-scoring-screen').classList.remove('hidden');
 
     requestWakeLock();

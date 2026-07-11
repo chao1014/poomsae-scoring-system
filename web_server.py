@@ -175,12 +175,14 @@ def api_stop_scoring():
 @app.route('/api/resume_scoring')
 def api_resume_scoring():
     config.current_state['is_scoring'] = True
+    config.current_state.pop('last_stop_data', None)  # 評分徵復，清除上次結果紀錄
     socketio.emit('scoring_resume', namespace='/')
     return "OK"
 
 @app.route('/api/reset_match')
 def api_reset_match():
     config.current_state['is_scoring'] = False
+    config.current_state.pop('last_stop_data', None)  # 重置比賳，清除上次結果紀錄
     for sid, jd in config.current_state['judges'].items():
         jd['submitted'] = False
         jd['chung_submitted'] = False
@@ -227,6 +229,16 @@ def api_test_pk():
     socketio.emit('pk_scoring_start', payload, namespace='/')
     return "已發送 PK 同時上場測試訊號！請查看裁判平板畫面。"
 
+def broadcast_connected_judges():
+    connected = []
+    for sid, jd in config.current_state['judges'].items():
+        if jd.get('connected', False) and not jd.get('id', '').startswith('manual_'):
+            connected.append(jd.get('id'))
+    socketio.emit('connected_judges_update', {'connected': list(set(connected))}, namespace='/')
+
+@socketio.on('connect')
+def handle_connect():
+    broadcast_connected_judges()
 
 @socketio.on('join_judge')
 def handle_join(data):
@@ -297,7 +309,9 @@ def handle_join(data):
             'freestyle_scores': existing_judge.get('freestyle_scores', {}),
             'player_payload': config.current_state.get('current_player_payload'),
             'timer_seconds': gui.timer_seconds if gui else 90,
-            'timer_running': gui.timer_running if gui else False
+            'timer_running': gui.timer_running if gui else False,
+            'last_stop_data': config.current_state.get('last_stop_data'),
+            'projection_slide_data': config.current_state.get('projection_slide_data')  # 用於還原最終結果畫面
         }, to=sid)
     else:
         config.current_state['judges'][sid] = {
@@ -324,6 +338,10 @@ def handle_join(data):
         'tournament_name': config.system_settings.get('tournament_name', '品勢評分賽事'),
         'court_no': config.system_settings.get('court_no', 1)
     }, to=sid)
+
+    projection_slide_data = config.current_state.get('projection_slide_data')
+    if projection_slide_data:
+        emit('projection_slide_changed', projection_slide_data, to=sid)
     
     if not existing_judge and config.current_state['is_scoring'] and config.current_state.get('current_player_payload'):
         payload = config.current_state['current_player_payload']
@@ -344,6 +362,7 @@ def handle_join(data):
             
     if gui:
         gui.root.after(0, gui.refresh_judge_slots)
+    broadcast_connected_judges()
 
 @socketio.on('modify_score')
 def handle_modify():
@@ -439,6 +458,7 @@ def handle_disconnect():
     gui = get_gui()
     if gui:
         gui.root.after(0, gui.refresh_judge_slots)
+    broadcast_connected_judges()
 
 @socketio.on('leave_judge')
 def handle_leave():
@@ -448,6 +468,7 @@ def handle_leave():
     gui = get_gui()
     if gui:
         gui.root.after(0, gui.refresh_judge_slots)
+    broadcast_connected_judges()
 
 def kick_invalid_judges():
     judge_count = int(config.system_settings.get("judge_count", 5))
@@ -822,12 +843,16 @@ def stop_scoring(final_score="", rank=""):
             pk_scores = calc_pk_history_scores()
         except Exception as e:
             print(f"Error calculating pk history scores: {e}")
-            
-    socketio.emit('scoring_stop', {
+    
+    stop_payload = {
         'final_score': final_score,
         'rank': rank,
         'mode': mode,
         'stage': stage,
         'is_pk_seq': is_pk_seq,
         'pk_scores': pk_scores
-    })
+    }
+    # 將最終結果儲存到全域狀態，方便重連時還原畫面
+    config.current_state['last_stop_data'] = stop_payload
+    
+    socketio.emit('scoring_stop', stop_payload)
