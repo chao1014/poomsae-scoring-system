@@ -1,9 +1,12 @@
 import os
+import threading
 from flask import Flask, render_template, request, send_file, Response, make_response
 from flask_socketio import SocketIO, emit, disconnect
 import socket
 import config
 import database
+
+state_lock = threading.RLock()
 
 # --- Flask 設定 ---
 PORT = 5003
@@ -122,40 +125,41 @@ def api_start_scoring():
     }
     
     # 更新當前打分方位到全域狀態，供大螢幕投影讀取
-    config.current_state['current_player_side'] = player_side
-    
-    # 每次開始新一輪評分前，重設所有裁判的 submitted 狀態與分數，避免上一步段狀態殘留
-    for sid, jd in config.current_state['judges'].items():
-        if player_side == 0:
-            # 新一場比賽開始（評分青方）：清空青方與紅方的分數，重置所有 submitted 狀態
-            jd['submitted'] = False
-            jd['chung_submitted'] = False
-            jd['hong_submitted'] = False
-            jd['acc'] = 0.0
-            jd['pres'] = 0.0
-            jd['p1'] = 0.0
-            jd['p2'] = 0.0
-            jd['p3'] = 0.0
-            jd['total'] = 0.0
-            jd['hong_acc'] = 0.0
-            jd['hong_pres'] = 0.0
-            jd['hong_p1'] = 0.0
-            jd['hong_p2'] = 0.0
-            jd['hong_p3'] = 0.0
-            jd['hong_total'] = 0.0
-            jd['freestyle_scores'] = {}
-        else:
-            # 切換至紅方：只重置紅方的 submitted 與分數，保留青方的分數與 submitted 狀態
-            jd['submitted'] = False
-            jd['hong_submitted'] = False
-            jd['hong_acc'] = 0.0
-            jd['hong_pres'] = 0.0
-            jd['hong_p1'] = 0.0
-            jd['hong_p2'] = 0.0
-            jd['hong_p3'] = 0.0
-            jd['hong_total'] = 0.0
-    
-    config.current_state['is_scoring'] = True
+    with state_lock:
+        config.current_state['current_player_side'] = player_side
+        
+        # 每次開始新一輪評分前，重設所有裁判的 submitted 狀態與分數，避免上一步段狀態殘留
+        for sid, jd in config.current_state['judges'].items():
+            if player_side == 0:
+                # 新一場比賽開始（評分青方）：清空青方與紅方的分數，重置所有 submitted 狀態
+                jd['submitted'] = False
+                jd['chung_submitted'] = False
+                jd['hong_submitted'] = False
+                jd['acc'] = 0.0
+                jd['pres'] = 0.0
+                jd['p1'] = 0.0
+                jd['p2'] = 0.0
+                jd['p3'] = 0.0
+                jd['total'] = 0.0
+                jd['hong_acc'] = 0.0
+                jd['hong_pres'] = 0.0
+                jd['hong_p1'] = 0.0
+                jd['hong_p2'] = 0.0
+                jd['hong_p3'] = 0.0
+                jd['hong_total'] = 0.0
+                jd['freestyle_scores'] = {}
+            else:
+                # 切換至紅方：只重置紅方的 submitted 與分數，保留青方的分數與 submitted 狀態
+                jd['submitted'] = False
+                jd['hong_submitted'] = False
+                jd['hong_acc'] = 0.0
+                jd['hong_pres'] = 0.0
+                jd['hong_p1'] = 0.0
+                jd['hong_p2'] = 0.0
+                jd['hong_p3'] = 0.0
+                jd['hong_total'] = 0.0
+        
+        config.current_state['is_scoring'] = True
     config.current_state['current_player_payload'] = payload
     if mode == 1 and pk_sequence_mode == 0:
         # PK 同時上場：發送專屬雙挹2面PK介面事件
@@ -181,25 +185,26 @@ def api_resume_scoring():
 
 @app.route('/api/reset_match')
 def api_reset_match():
-    config.current_state['is_scoring'] = False
-    config.current_state.pop('last_stop_data', None)  # 重置比賳，清除上次結果紀錄
-    for sid, jd in config.current_state['judges'].items():
-        jd['submitted'] = False
-        jd['chung_submitted'] = False
-        jd['hong_submitted'] = False
-        jd['acc'] = 4.0
-        jd['pres'] = 6.0
-        jd['p1'] = 2.0
-        jd['p2'] = 2.0
-        jd['p3'] = 2.0
-        jd['total'] = 10.0
-        jd['hong_acc'] = 4.0
-        jd['hong_pres'] = 6.0
-        jd['hong_p1'] = 2.0
-        jd['hong_p2'] = 2.0
-        jd['hong_p3'] = 2.0
-        jd['hong_total'] = 10.0
-        jd['freestyle_scores'] = {}
+    with state_lock:
+        config.current_state['is_scoring'] = False
+        config.current_state.pop('last_stop_data', None)  # 重置比賳，清除上次結果紀錄
+        for sid, jd in config.current_state['judges'].items():
+            jd['submitted'] = False
+            jd['chung_submitted'] = False
+            jd['hong_submitted'] = False
+            jd['acc'] = 4.0
+            jd['pres'] = 6.0
+            jd['p1'] = 2.0
+            jd['p2'] = 2.0
+            jd['p3'] = 2.0
+            jd['total'] = 10.0
+            jd['hong_acc'] = 4.0
+            jd['hong_pres'] = 6.0
+            jd['hong_p1'] = 2.0
+            jd['hong_p2'] = 2.0
+            jd['hong_p3'] = 2.0
+            jd['hong_total'] = 10.0
+            jd['freestyle_scores'] = {}
     socketio.emit('reset_match')
     return "OK"
 
@@ -230,10 +235,11 @@ def api_test_pk():
     return "已發送 PK 同時上場測試訊號！請查看裁判平板畫面。"
 
 def broadcast_connected_judges():
-    connected = []
-    for sid, jd in config.current_state['judges'].items():
-        if jd.get('connected', False) and not jd.get('id', '').startswith('manual_'):
-            connected.append(jd.get('id'))
+    with state_lock:
+        connected = []
+        for sid, jd in config.current_state['judges'].items():
+            if jd.get('connected', False) and not jd.get('id', '').startswith('manual_'):
+                connected.append(jd.get('id'))
     socketio.emit('connected_judges_update', {'connected': list(set(connected))}, namespace='/')
 
 @socketio.on('connect')
@@ -255,111 +261,112 @@ def handle_join(data):
                 return
     except Exception as e:
         print(f"限制連入判定異常: {e}")
-        
-    existing_judge = None
-    existing_sid = None
-    for old_sid, jd in list(config.current_state['judges'].items()):
-        if jd.get('id') == judge_name and not old_sid.startswith('manual_'):
-            existing_judge = jd
-            existing_sid = old_sid
-            break
-            
-    gui = get_gui()
-    if existing_judge:
-        if existing_judge.get('kicked', False):
-            config.current_state['judges'].pop(existing_sid, None)
-            emit('force_disconnect', {}, to=sid)
-            return
-            
-        if existing_judge.get('connected', False) and existing_sid != sid:
-            # iOS 裝置（如 iPad）重新整理時可能不會馬上斷開舊 Socket，
-            # 為了避免裁判被卡在登入畫面，當偵測到同名登入時，主動踢除舊連線，由新連線接管。
-            emit('force_disconnect', {}, to=existing_sid)
-            disconnect(sid=existing_sid)
-            print(f"[{judge_name}] 偵測到重複登入，舊連線 ({existing_sid}) 已被強制斷開，由新連線接管。")
-            
-        config.current_state['judges'].pop(existing_sid, None)
-        config.current_state['judges'][sid] = existing_judge
-        config.current_state['judges'][sid]['connected'] = True
-        
-        mode = gui.mode_var.get() if gui else 0
-        stage = gui.current_stage if gui else 1
-        pk_seq = int(config.system_settings.get('pk_sequence_mode', 0))
-        current_side = config.current_state.get('current_player_side', 0)
-        
-        emit('reconnect_state', {
-            'is_scoring': config.current_state['is_scoring'],
-            'accuracy': existing_judge.get('acc', 4.0),
-            'presentation': existing_judge.get('pres', 6.0),
-            'p1': existing_judge.get('p1', 2.0),
-            'p2': existing_judge.get('p2', 2.0),
-            'p3': existing_judge.get('p3', 2.0),
-            'hong_accuracy': existing_judge.get('hong_acc', 4.0),
-            'hong_presentation': existing_judge.get('hong_pres', 6.0),
-            'hong_p1': existing_judge.get('hong_p1', 2.0),
-            'hong_p2': existing_judge.get('hong_p2', 2.0),
-            'hong_p3': existing_judge.get('hong_p3', 2.0),
-            'submitted': existing_judge.get('submitted', False),
-            'chung_submitted': existing_judge.get('chung_submitted', False),
-            'hong_submitted': existing_judge.get('hong_submitted', False),
-            'pk_sequence_mode': pk_seq,
-            'current_player_side': current_side,
-            'mode': mode,
-            'stage': stage,
-            'freestyle_scores': existing_judge.get('freestyle_scores', {}),
-            'player_payload': config.current_state.get('current_player_payload'),
-            'timer_seconds': gui.timer_seconds if gui else 90,
-            'timer_running': gui.timer_running if gui else False,
-            'last_stop_data': config.current_state.get('last_stop_data'),
-            'projection_slide_data': config.current_state.get('projection_slide_data')  # 用於還原最終結果畫面
-        }, to=sid)
-    else:
-        config.current_state['judges'][sid] = {
-            'id': judge_name, 
-            'acc': 4.0, 
-            'pres': 6.0, 
-            'p1': 2.0,
-            'p2': 2.0,
-            'p3': 2.0,
-            'total': 10.0, 
-            'hong_acc': 4.0,
-            'hong_pres': 6.0,
-            'hong_p1': 2.0,
-            'hong_p2': 2.0,
-            'hong_p3': 2.0,
-            'hong_total': 10.0,
-            'submitted': False,
-            'connected': True,
-            'freestyle_scores': {}
-        }
-        
-    emit('status_update', {
-        'is_scoring': config.current_state['is_scoring'],
-        'tournament_name': config.system_settings.get('tournament_name', '品勢評分賽事'),
-        'court_no': config.system_settings.get('court_no', 1)
-    }, to=sid)
-
-    projection_slide_data = config.current_state.get('projection_slide_data')
-    if projection_slide_data:
-        emit('projection_slide_changed', projection_slide_data, to=sid)
     
-    if not existing_judge and config.current_state['is_scoring'] and config.current_state.get('current_player_payload'):
-        payload = config.current_state['current_player_payload']
-        pk_seq = int(config.system_settings.get('pk_sequence_mode', 0))
-        payload_mode = payload.get('mode', 0)
-        is_pk_simultaneous = (payload_mode == 1 and pk_seq == 0)
-        if is_pk_simultaneous:
-            # PK 同時上場：裁判端使用雙側 PK 介面
-            emit('pk_scoring_start', payload, to=sid)
-        else:
-            # 一般賽制 / PK 交叉依序上場：裁判端使用一般評分介面
-            emit('scoring_start', payload, to=sid)
-        if gui:
-            emit('timer_sync', {
-                'seconds': gui.timer_seconds,
-                'running': gui.timer_running
-            }, to=sid)
+    with state_lock:
+        existing_judge = None
+        existing_sid = None
+        for old_sid, jd in list(config.current_state['judges'].items()):
+            if jd.get('id') == judge_name and not old_sid.startswith('manual_'):
+                existing_judge = jd
+                existing_sid = old_sid
+                break
+                
+        gui = get_gui()
+        if existing_judge:
+            if existing_judge.get('kicked', False):
+                config.current_state['judges'].pop(existing_sid, None)
+                emit('force_disconnect', {}, to=sid)
+                return
+                
+            if existing_judge.get('connected', False) and existing_sid != sid:
+                # iOS 裝置（如 iPad）重新整理時可能不會馬上斷開舊 Socket，
+                # 為了避免裁判被卡在登入畫面，當偵測到同名登入時，主動踢除舊連線，由新連線接管。
+                emit('force_disconnect', {}, to=existing_sid)
+                disconnect(sid=existing_sid)
+                print(f"[{judge_name}] 偵測到重複登入，舊連線 ({existing_sid}) 已被強制斷開，由新連線接管。")
+                
+            config.current_state['judges'].pop(existing_sid, None)
+            config.current_state['judges'][sid] = existing_judge
+            config.current_state['judges'][sid]['connected'] = True
             
+            mode = gui.mode_var.get() if gui else 0
+            stage = gui.current_stage if gui else 1
+            pk_seq = int(config.system_settings.get('pk_sequence_mode', 0))
+            current_side = config.current_state.get('current_player_side', 0)
+            
+            emit('reconnect_state', {
+                'is_scoring': config.current_state['is_scoring'],
+                'accuracy': existing_judge.get('acc', 4.0),
+                'presentation': existing_judge.get('pres', 6.0),
+                'p1': existing_judge.get('p1', 2.0),
+                'p2': existing_judge.get('p2', 2.0),
+                'p3': existing_judge.get('p3', 2.0),
+                'hong_accuracy': existing_judge.get('hong_acc', 4.0),
+                'hong_presentation': existing_judge.get('hong_pres', 6.0),
+                'hong_p1': existing_judge.get('hong_p1', 2.0),
+                'hong_p2': existing_judge.get('hong_p2', 2.0),
+                'hong_p3': existing_judge.get('hong_p3', 2.0),
+                'submitted': existing_judge.get('submitted', False),
+                'chung_submitted': existing_judge.get('chung_submitted', False),
+                'hong_submitted': existing_judge.get('hong_submitted', False),
+                'pk_sequence_mode': pk_seq,
+                'current_player_side': current_side,
+                'mode': mode,
+                'stage': stage,
+                'freestyle_scores': existing_judge.get('freestyle_scores', {}),
+                'player_payload': config.current_state.get('current_player_payload'),
+                'timer_seconds': gui.timer_seconds if gui else 90,
+                'timer_running': gui.timer_running if gui else False,
+                'last_stop_data': config.current_state.get('last_stop_data'),
+                'projection_slide_data': config.current_state.get('projection_slide_data')  # 用於還原最終結果畫面
+            }, to=sid)
+        else:
+            config.current_state['judges'][sid] = {
+                'id': judge_name, 
+                'acc': 4.0, 
+                'pres': 6.0, 
+                'p1': 2.0,
+                'p2': 2.0,
+                'p3': 2.0,
+                'total': 10.0, 
+                'hong_acc': 4.0,
+                'hong_pres': 6.0,
+                'hong_p1': 2.0,
+                'hong_p2': 2.0,
+                'hong_p3': 2.0,
+                'hong_total': 10.0,
+                'submitted': False,
+                'connected': True,
+                'freestyle_scores': {}
+            }
+            
+        emit('status_update', {
+            'is_scoring': config.current_state['is_scoring'],
+            'tournament_name': config.system_settings.get('tournament_name', '品勢評分賽事'),
+            'court_no': config.system_settings.get('court_no', 1)
+        }, to=sid)
+
+        projection_slide_data = config.current_state.get('projection_slide_data')
+        if projection_slide_data:
+            emit('projection_slide_changed', projection_slide_data, to=sid)
+        
+        if not existing_judge and config.current_state['is_scoring'] and config.current_state.get('current_player_payload'):
+            payload = config.current_state['current_player_payload']
+            pk_seq = int(config.system_settings.get('pk_sequence_mode', 0))
+            payload_mode = payload.get('mode', 0)
+            is_pk_simultaneous = (payload_mode == 1 and pk_seq == 0)
+            if is_pk_simultaneous:
+                # PK 同時上場：裁判端使用雙側 PK 介面
+                emit('pk_scoring_start', payload, to=sid)
+            else:
+                # 一般賽制 / PK 交叉依序上場：裁判端使用一般評分介面
+                emit('scoring_start', payload, to=sid)
+            if gui:
+                emit('timer_sync', {
+                    'seconds': gui.timer_seconds,
+                    'running': gui.timer_running
+                }, to=sid)
+                
     if gui:
         gui.root.after(0, gui.refresh_judge_slots)
     broadcast_connected_judges()
@@ -367,94 +374,99 @@ def handle_join(data):
 @socketio.on('modify_score')
 def handle_modify():
     sid = request.sid
-    if sid in config.current_state['judges']:
-        jd = config.current_state['judges'][sid]
-        jd['submitted'] = False
-        jd['acc'] = 0.0
-        jd['pres'] = 0.0
-        jd['p1'] = 0.0
-        jd['p2'] = 0.0
-        jd['p3'] = 0.0
-        jd['total'] = 0.0
-        gui = get_gui()
-        if gui:
-            gui.root.after(0, gui.refresh_judge_slots)
-            gui.root.after(0, check_all_submitted)
+    with state_lock:
+        if sid in config.current_state['judges']:
+            jd = config.current_state['judges'][sid]
+            jd['submitted'] = False
+            jd['acc'] = 0.0
+            jd['pres'] = 0.0
+            jd['p1'] = 0.0
+            jd['p2'] = 0.0
+            jd['p3'] = 0.0
+            jd['total'] = 0.0
+            gui = get_gui()
+            if gui:
+                gui.root.after(0, gui.refresh_judge_slots)
+                gui.root.after(0, check_all_submitted)
 
 @socketio.on('submit_score')
 def handle_score(data):
-    if not config.current_state['is_scoring']: return
     sid = request.sid
-    if sid in config.current_state['judges']:
-        jd = config.current_state['judges'][sid]
-        
-        current_side = config.current_state.get('current_player_side', 0)
-        mode = config.current_state.get('current_player_payload', {}).get('mode', 0)
-        pk_seq = int(config.system_settings.get('pk_sequence_mode', 0))
-        
-        if mode == 1 and (pk_seq == 1 or pk_seq == 2) and current_side == 1:
-            # PK交叉/依序上場：紅方評分，儲存至 hong_ 系列欄位
-            jd['hong_acc'] = float(data.get('accuracy', 0))
-            jd['hong_pres'] = float(data.get('presentation', 0))
-            jd['hong_p1'] = float(data.get('p1', 0.0))
-            jd['hong_p2'] = float(data.get('p2', 0.0))
-            jd['hong_p3'] = float(data.get('p3', 0.0))
-            jd['hong_total'] = jd['hong_acc'] + jd['hong_pres']
-            jd['pk_mode'] = 'sequence'
-            jd['hong_submitted'] = True
-        else:
-            # 一般賽制或 PK 交叉/依序上場的青方評分，儲存至一般欄位
-            jd['acc'] = float(data.get('accuracy', 0))
-            jd['pres'] = float(data.get('presentation', 0))
-            jd['p1'] = float(data.get('p1', 0.0))
-            jd['p2'] = float(data.get('p2', 0.0))
-            jd['p3'] = float(data.get('p3', 0.0))
-            jd['total'] = jd['acc'] + jd['pres']
-            jd['pk_mode'] = 'sequence' if (mode == 1 and (pk_seq == 1 or pk_seq == 2)) else 'normal'
-            jd['chung_submitted'] = True
+    with state_lock:
+        if not config.current_state['is_scoring']: return
+        if sid in config.current_state['judges']:
+            jd = config.current_state['judges'][sid]
+            
+            current_side = config.current_state.get('current_player_side', 0)
+            mode = config.current_state.get('current_player_payload', {}).get('mode', 0)
+            pk_seq = int(config.system_settings.get('pk_sequence_mode', 0))
+            
+            if mode == 1 and (pk_seq == 1 or pk_seq == 2) and current_side == 1:
+                # PK交叉/依序上場：紅方評分，儲存至 hong_ 系列欄位
+                jd['hong_acc'] = float(data.get('accuracy', 0))
+                jd['hong_pres'] = float(data.get('presentation', 0))
+                jd['hong_p1'] = float(data.get('p1', 0.0))
+                jd['hong_p2'] = float(data.get('p2', 0.0))
+                jd['hong_p3'] = float(data.get('p3', 0.0))
+                jd['hong_total'] = jd['hong_acc'] + jd['hong_pres']
+                jd['pk_mode'] = 'sequence'
+                jd['hong_submitted'] = True
+            else:
+                # 一般賽制或 PK 交叉/依序上場的青方評分，儲存至一般欄位
+                jd['acc'] = float(data.get('accuracy', 0))
+                jd['pres'] = float(data.get('presentation', 0))
+                jd['p1'] = float(data.get('p1', 0.0))
+                jd['p2'] = float(data.get('p2', 0.0))
+                jd['p3'] = float(data.get('p3', 0.0))
+                jd['total'] = jd['acc'] + jd['pres']
+                jd['pk_mode'] = 'sequence' if (mode == 1 and (pk_seq == 1 or pk_seq == 2)) else 'normal'
+                jd['chung_submitted'] = True
 
-        jd['submitted'] = True
-        check_all_submitted()
+            jd['submitted'] = True
+            check_all_submitted()
 
 @socketio.on('pk_submit_score')
 def handle_pk_score(data):
     """PK 同時上場：裁判一次送出青方（player_side=0）與紅方（player_side=1）的分數"""
-    if not config.current_state['is_scoring']: return
     sid = request.sid
-    if sid not in config.current_state['judges']: return
     
-    jd = config.current_state['judges'][sid]
-    chung_data = data.get('chung', {})
-    hong_data  = data.get('hong', {})
-    
-    # 儲存青方分數（以 player_side=0 標記）
-    jd['acc']  = float(chung_data.get('accuracy', 0))
-    jd['pres'] = float(chung_data.get('presentation', 0))
-    jd['p1']   = float(chung_data.get('p1', 0.0))
-    jd['p2']   = float(chung_data.get('p2', 0.0))
-    jd['p3']   = float(chung_data.get('p3', 0.0))
-    jd['total'] = round(jd['acc'] + jd['pres'], 1)
-    
-    # 額外儲存紅方分數，供主控台匯總使用
-    jd['hong_acc']  = float(hong_data.get('accuracy', 0))
-    jd['hong_pres'] = float(hong_data.get('presentation', 0))
-    jd['hong_p1']   = float(hong_data.get('p1', 0.0))
-    jd['hong_p2']   = float(hong_data.get('p2', 0.0))
-    jd['hong_p3']   = float(hong_data.get('p3', 0.0))
-    jd['hong_total'] = round(jd['hong_acc'] + jd['hong_pres'], 1)
-    
-    jd['submitted'] = True
-    jd['pk_mode'] = 'simultaneous'
-    
-    check_all_submitted()
+    with state_lock:
+        if not config.current_state['is_scoring']: return
+        if sid not in config.current_state['judges']: return
+        
+        jd = config.current_state['judges'][sid]
+        chung_data = data.get('chung', {})
+        hong_data  = data.get('hong', {})
+        
+        # 儲存青方分數（以 player_side=0 標記）
+        jd['acc']  = float(chung_data.get('accuracy', 0))
+        jd['pres'] = float(chung_data.get('presentation', 0))
+        jd['p1']   = float(chung_data.get('p1', 0.0))
+        jd['p2']   = float(chung_data.get('p2', 0.0))
+        jd['p3']   = float(chung_data.get('p3', 0.0))
+        jd['total'] = round(jd['acc'] + jd['pres'], 1)
+        
+        # 額外儲存紅方分數，供主控台匯總使用
+        jd['hong_acc']  = float(hong_data.get('accuracy', 0))
+        jd['hong_pres'] = float(hong_data.get('presentation', 0))
+        jd['hong_p1']   = float(hong_data.get('p1', 0.0))
+        jd['hong_p2']   = float(hong_data.get('p2', 0.0))
+        jd['hong_p3']   = float(hong_data.get('p3', 0.0))
+        jd['hong_total'] = round(jd['hong_acc'] + jd['hong_pres'], 1)
+        
+        jd['submitted'] = True
+        jd['pk_mode'] = 'simultaneous'
+        
+        check_all_submitted()
 
 
 
 @socketio.on('disconnect')
 def handle_disconnect():
     sid = request.sid
-    if sid in config.current_state['judges']:
-        config.current_state['judges'][sid]['connected'] = False
+    with state_lock:
+        if sid in config.current_state['judges']:
+            config.current_state['judges'][sid]['connected'] = False
     gui = get_gui()
     if gui:
         gui.root.after(0, gui.refresh_judge_slots)
@@ -463,8 +475,9 @@ def handle_disconnect():
 @socketio.on('leave_judge')
 def handle_leave():
     sid = request.sid
-    if sid in config.current_state['judges']:
-        config.current_state['judges'].pop(sid, None)
+    with state_lock:
+        if sid in config.current_state['judges']:
+            config.current_state['judges'].pop(sid, None)
     gui = get_gui()
     if gui:
         gui.root.after(0, gui.refresh_judge_slots)
@@ -472,23 +485,25 @@ def handle_leave():
 
 def kick_invalid_judges():
     judge_count = int(config.system_settings.get("judge_count", 5))
-    sids_to_remove = []
-    for sid, data in config.current_state['judges'].items():
-        jid_str = data.get('id', '')
-        judge_num = 0
-        if jid_str.startswith('J'):
-            try: judge_num = int(jid_str[1:])
-            except: pass
-        elif jid_str.startswith('manual_J'):
-            try: judge_num = int(jid_str[8:])
-            except: pass
-            
-        if judge_num > judge_count:
-            sids_to_remove.append(sid)
-            
-    for sid in sids_to_remove:
-        socketio.emit('force_disconnect', {}, to=sid)
-        config.current_state['judges'].pop(sid, None)
+    
+    with state_lock:
+        sids_to_remove = []
+        for sid, data in config.current_state['judges'].items():
+            jid_str = data.get('id', '')
+            judge_num = 0
+            if jid_str.startswith('J'):
+                try: judge_num = int(jid_str[1:])
+                except: pass
+            elif jid_str.startswith('manual_J'):
+                try: judge_num = int(jid_str[8:])
+                except: pass
+                
+            if judge_num > judge_count:
+                sids_to_remove.append(sid)
+                
+        for sid in sids_to_remove:
+            socketio.emit('force_disconnect', {}, to=sid)
+            config.current_state['judges'].pop(sid, None)
         
     gui = get_gui()
     if gui:
@@ -502,13 +517,19 @@ def check_all_submitted():
         gui.root.after(0, _check_all_submitted_main_thread)
 
 def _check_all_submitted_main_thread():
-    if not config.current_state['judges']: return
+    with state_lock:
+        if not config.current_state['judges']: return
+        judges_snapshot = {
+            sid: jdata.copy()
+            for sid, jdata in config.current_state['judges'].items()
+        }
+    
     required_judges = int(config.system_settings["judge_count"])
     gui = get_gui()
     if not gui: return
     
     unique_judges = {}
-    for sid, jdata in config.current_state['judges'].items():
+    for sid, jdata in judges_snapshot.items():
         jid = jdata.get('id', '')
         if not jid:
             continue
