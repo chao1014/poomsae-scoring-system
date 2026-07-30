@@ -1,5 +1,7 @@
 import os
+import sys
 import threading
+from datetime import datetime
 from flask import Flask, render_template, request, send_file, Response, make_response
 from flask_socketio import SocketIO, emit, disconnect
 import socket
@@ -7,12 +9,31 @@ import config
 import database
 
 state_lock = threading.RLock()
+connection_log_lock = threading.Lock()
 
 # --- Flask 設定 ---
 PORT = 5003
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading', ping_timeout=5, ping_interval=2)
+# Allow short server/Wi-Fi stalls without dropping every judge at once.
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading', ping_timeout=30, ping_interval=10)
+
+
+def log_connection_event(event, sid, judge_id="", reason="", remote_addr=""):
+    """Write lightweight connection diagnostics next to the app executable."""
+    try:
+        base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        log_path = os.path.join(base_dir, "connection_events.log")
+        line = (
+            f"{datetime.now().isoformat(timespec='seconds')} "
+            f"event={event} sid={sid} judge={judge_id or '-'} "
+            f"reason={reason or '-'} remote={remote_addr or '-'}\n"
+        )
+        with connection_log_lock:
+            with open(log_path, "a", encoding="utf-8") as log_file:
+                log_file.write(line)
+    except Exception:
+        pass
 
 # --- 內部 SSL 通道設定 (保持與原 app.py 一致) ---
 USE_SSL = False
@@ -128,36 +149,40 @@ def api_start_scoring():
     with state_lock:
         config.current_state['current_player_side'] = player_side
         
-        # 每次開始新一輪評分前，重設所有裁判的 submitted 狀態與分數，避免上一步段狀態殘留
+        # 未送出與零分是不同狀態。以滿分作為新一輪草稿初值，submitted 仍控制主控端是否採計。
+        default_freestyle_scores = {
+            **{f't{i}': 1.0 for i in range(1, 7)},
+            **{f'pr{i}': 1.0 for i in range(1, 5)}
+        } if mode == 2 else {}
         for sid, jd in config.current_state['judges'].items():
             if player_side == 0:
-                # 新一場比賽開始（評分青方）：清空青方與紅方的分數，重置所有 submitted 狀態
+                # 新一場比賽開始（評分青方）：重置雙方草稿與 submitted 狀態
                 jd['submitted'] = False
                 jd['chung_submitted'] = False
                 jd['hong_submitted'] = False
-                jd['acc'] = 0.0
-                jd['pres'] = 0.0
-                jd['p1'] = 0.0
-                jd['p2'] = 0.0
-                jd['p3'] = 0.0
-                jd['total'] = 0.0
-                jd['hong_acc'] = 0.0
-                jd['hong_pres'] = 0.0
-                jd['hong_p1'] = 0.0
-                jd['hong_p2'] = 0.0
-                jd['hong_p3'] = 0.0
-                jd['hong_total'] = 0.0
-                jd['freestyle_scores'] = {}
+                jd['acc'] = 4.0
+                jd['pres'] = 6.0
+                jd['p1'] = 2.0
+                jd['p2'] = 2.0
+                jd['p3'] = 2.0
+                jd['total'] = 10.0
+                jd['hong_acc'] = 4.0
+                jd['hong_pres'] = 6.0
+                jd['hong_p1'] = 2.0
+                jd['hong_p2'] = 2.0
+                jd['hong_p3'] = 2.0
+                jd['hong_total'] = 10.0
+                jd['freestyle_scores'] = dict(default_freestyle_scores)
             else:
-                # 切換至紅方：只重置紅方的 submitted 與分數，保留青方的分數與 submitted 狀態
+                # 切換至紅方：重置紅方草稿，保留青方已完成的分數
                 jd['submitted'] = False
                 jd['hong_submitted'] = False
-                jd['hong_acc'] = 0.0
-                jd['hong_pres'] = 0.0
-                jd['hong_p1'] = 0.0
-                jd['hong_p2'] = 0.0
-                jd['hong_p3'] = 0.0
-                jd['hong_total'] = 0.0
+                jd['hong_acc'] = 4.0
+                jd['hong_pres'] = 6.0
+                jd['hong_p1'] = 2.0
+                jd['hong_p2'] = 2.0
+                jd['hong_p3'] = 2.0
+                jd['hong_total'] = 10.0
         
         config.current_state['is_scoring'] = True
     config.current_state['current_player_payload'] = payload
@@ -244,12 +269,14 @@ def broadcast_connected_judges():
 
 @socketio.on('connect')
 def handle_connect():
+    log_connection_event('connect', request.sid, remote_addr=request.remote_addr)
     broadcast_connected_judges()
 
 @socketio.on('join_judge')
 def handle_join(data):
     judge_name = data.get('judge_id', 'Unknown')
     sid = request.sid
+    log_connection_event('join', sid, judge_id=judge_name, remote_addr=request.remote_addr)
     
     # 限制僅允許符合設定中開放人數的裁判連入
     try:
@@ -289,9 +316,10 @@ def handle_join(data):
             config.current_state['judges'][sid] = existing_judge
             config.current_state['judges'][sid]['connected'] = True
             
-            mode = gui.mode_var.get() if gui else 0
-            stage = gui.current_stage if gui else 1
-            pk_seq = int(config.system_settings.get('pk_sequence_mode', 0))
+            current_payload = config.current_state.get('current_player_payload') or {}
+            mode = current_payload.get('mode', gui.mode_var.get() if gui else 0)
+            stage = current_payload.get('stage', gui.current_stage if gui else 1)
+            pk_seq = int(current_payload.get('pk_sequence_mode', config.system_settings.get('pk_sequence_mode', 0)))
             current_side = config.current_state.get('current_player_side', 0)
             
             emit('reconnect_state', {
@@ -371,19 +399,86 @@ def handle_join(data):
         gui.root.after(0, gui.refresh_judge_slots)
     broadcast_connected_judges()
 
+def _draft_score_value(data, key, default, maximum):
+    try:
+        value = round(float(data.get(key, default)), 1)
+    except (TypeError, ValueError):
+        value = default
+    return min(max(value, 0.0), maximum)
+
+
+def _store_score_draft(judge_data, score_data, prefix='', accuracy_max=4.0, presentation_max=6.0):
+    acc = _draft_score_value(score_data, 'accuracy', 4.0, accuracy_max)
+    pres = _draft_score_value(score_data, 'presentation', 6.0, presentation_max)
+    judge_data[f'{prefix}acc'] = acc
+    judge_data[f'{prefix}pres'] = pres
+    judge_data[f'{prefix}p1'] = _draft_score_value(score_data, 'p1', 2.0, 2.0)
+    judge_data[f'{prefix}p2'] = _draft_score_value(score_data, 'p2', 2.0, 2.0)
+    judge_data[f'{prefix}p3'] = _draft_score_value(score_data, 'p3', 2.0, 2.0)
+    judge_data[f'{prefix}total'] = round(acc + pres, 1)
+
+
+@socketio.on('score_draft')
+def handle_score_draft(data):
+    """保存尚未送出的裁判草稿，供斷線重連時原值恢復。"""
+    sid = request.sid
+    if not isinstance(data, dict):
+        return
+    with state_lock:
+        if not config.current_state.get('is_scoring') or sid not in config.current_state['judges']:
+            return
+        jd = config.current_state['judges'][sid]
+        if jd.get('submitted', False):
+            return
+
+        payload = config.current_state.get('current_player_payload') or {}
+        mode = int(payload.get('mode', 0))
+        pk_seq = int(payload.get('pk_sequence_mode', config.system_settings.get('pk_sequence_mode', 0)))
+        current_side = int(config.current_state.get('current_player_side', 0))
+
+        if mode == 1 and pk_seq == 0:
+            chung = data.get('chung')
+            hong = data.get('hong')
+            if isinstance(chung, dict):
+                _store_score_draft(jd, chung)
+            if isinstance(hong, dict):
+                _store_score_draft(jd, hong, prefix='hong_')
+        else:
+            prefix = 'hong_' if mode == 1 and pk_seq in (1, 2) and current_side == 1 else ''
+            accuracy_max = 6.0 if mode == 2 else 4.0
+            presentation_max = 4.0 if mode == 2 else 6.0
+            _store_score_draft(jd, data, prefix=prefix, accuracy_max=accuracy_max, presentation_max=presentation_max)
+            if mode == 2:
+                allowed_keys = {f't{i}' for i in range(1, 7)} | {f'pr{i}' for i in range(1, 5)}
+                raw_scores = data.get('freestyle_scores', {})
+                if isinstance(raw_scores, dict):
+                    jd['freestyle_scores'] = {
+                        key: _draft_score_value(raw_scores, key, 1.0, 1.0)
+                        for key in allowed_keys
+                    }
+
+
 @socketio.on('modify_score')
 def handle_modify():
     sid = request.sid
     with state_lock:
         if sid in config.current_state['judges']:
             jd = config.current_state['judges'][sid]
+            payload = config.current_state.get('current_player_payload') or {}
+            mode = int(payload.get('mode', 0))
+            pk_seq = int(payload.get('pk_sequence_mode', config.system_settings.get('pk_sequence_mode', 0)))
+            current_side = int(config.current_state.get('current_player_side', 0))
+
+            # 修改時只撤銷送出狀態，保留原分數作為草稿；斷線後才能恢復原值。
             jd['submitted'] = False
-            jd['acc'] = 0.0
-            jd['pres'] = 0.0
-            jd['p1'] = 0.0
-            jd['p2'] = 0.0
-            jd['p3'] = 0.0
-            jd['total'] = 0.0
+            if mode == 1 and pk_seq == 0:
+                jd['chung_submitted'] = False
+                jd['hong_submitted'] = False
+            elif mode == 1 and pk_seq in (1, 2) and current_side == 1:
+                jd['hong_submitted'] = False
+            else:
+                jd['chung_submitted'] = False
+
             gui = get_gui()
             if gui:
                 gui.root.after(0, gui.refresh_judge_slots)
@@ -421,6 +516,15 @@ def handle_score(data):
                 jd['total'] = jd['acc'] + jd['pres']
                 jd['pk_mode'] = 'sequence' if (mode == 1 and (pk_seq == 1 or pk_seq == 2)) else 'normal'
                 jd['chung_submitted'] = True
+
+            if mode == 2:
+                raw_scores = data.get('freestyle_scores', {})
+                allowed_keys = {f't{i}' for i in range(1, 7)} | {f'pr{i}' for i in range(1, 5)}
+                if isinstance(raw_scores, dict):
+                    jd['freestyle_scores'] = {
+                        key: _draft_score_value(raw_scores, key, 1.0, 1.0)
+                        for key in allowed_keys
+                    }
 
             jd['submitted'] = True
             check_all_submitted()
@@ -462,11 +566,14 @@ def handle_pk_score(data):
 
 
 @socketio.on('disconnect')
-def handle_disconnect():
+def handle_disconnect(reason=None):
     sid = request.sid
+    judge_id = ""
     with state_lock:
         if sid in config.current_state['judges']:
+            judge_id = config.current_state['judges'][sid].get('id', '')
             config.current_state['judges'][sid]['connected'] = False
+    log_connection_event('disconnect', sid, judge_id=judge_id, reason=reason, remote_addr=request.remote_addr)
     gui = get_gui()
     if gui:
         gui.root.after(0, gui.refresh_judge_slots)
@@ -571,12 +678,13 @@ def _check_all_submitted_main_thread():
         
         def calc_avg(scores):
             if not scores: return 0.0
-            if len(scores) <= 3: return sum(scores) / len(scores)
-            else:
-                scores_only = list(scores)
-                scores_only.sort()
-                valid = scores_only[1:-1]
-                return sum(valid) / len(valid)
+            # Judge inputs use 0.1-point units. Normalize before averaging
+            # so binary-float noise cannot change the third decimal place.
+            scores_only = [round(float(score), 1) for score in scores]
+            if len(scores_only) <= 3: return sum(scores_only) / len(scores_only)
+            scores_only.sort()
+            valid = scores_only[1:-1]
+            return sum(valid) / len(valid)
 
         avg_acc = calc_avg(acc_list)
         avg_pres = calc_avg(pres_list)
@@ -584,14 +692,12 @@ def _check_all_submitted_main_thread():
         try: deduction = float(gui.lbl_deduction_val.cget("text"))
         except: deduction = 0.0
 
+        # Keep full precision for deduction and two-round calculations.
+        # Formatting below still limits the visible number of decimals.
         final_score = avg_acc + avg_pres - deduction
         
-        avg_acc = round(avg_acc, 2)
-        avg_pres = round(avg_pres, 2)
-        final_score = round(final_score, 3) 
-        
-        sum_acc = round(sum(acc_list), 2)
-        sum_pres = round(sum(pres_list), 2)
+        sum_acc = sum(round(float(score), 1) for score in acc_list)
+        sum_pres = sum(round(float(score), 1) for score in pres_list)
         raw_sum = round(sum_acc + sum_pres, 2)
 
         gui.temp_avg_acc = avg_acc
@@ -624,14 +730,11 @@ def _check_all_submitted_main_thread():
                 try: deduction_R = float(gui.lbl_deduction_val_R.cget("text"))
                 except: deduction_R = 0.0
                 
+                # Match the log calculation by rounding only for display.
                 hong_final_score = hong_avg_acc + hong_avg_pres - deduction_R
                 
-                hong_avg_acc = round(hong_avg_acc, 2)
-                hong_avg_pres = round(hong_avg_pres, 2)
-                hong_final_score = round(hong_final_score, 3)
-                
-                hong_sum_acc = round(sum(hong_acc_list), 2)
-                hong_sum_pres = round(sum(hong_pres_list), 2)
+                hong_sum_acc = sum(round(float(score), 1) for score in hong_acc_list)
+                hong_sum_pres = sum(round(float(score), 1) for score in hong_pres_list)
                 hong_raw_sum = round(hong_sum_acc + hong_sum_pres, 2)
                 
                 gui.center_stats_labels["Total_R_0"].config(text=f"{hong_sum_acc:.1f}")
@@ -805,14 +908,14 @@ def calc_pk_history_scores():
         
     def calc_avg(scores):
         if not scores: return 0.0
-        if len(scores) <= 3: return sum(scores) / len(scores)
-        scores_only = list(scores)
+        scores_only = [round(float(score), 1) for score in scores]
+        if len(scores_only) <= 3: return sum(scores_only) / len(scores_only)
         scores_only.sort()
         valid = scores_only[1:-1]
         return sum(valid) / len(valid)
         
     def calc_group_metrics(grp_data):
-        if not grp_data: return {'total': 0.0}
+        if not grp_data: return {'total': 0.0, 'pres': 0.0, 'raw_sum': 0.0}
         accs = grp_data['acc']
         press = grp_data['pres']
         deds = grp_data['ded']
@@ -821,7 +924,8 @@ def calc_pk_history_scores():
         avg_pres = calc_avg(press)
         deduction = max(deds) if deds else 0.0
         final = avg_acc + avg_pres - deduction
-        return {'total': final}
+        raw_sum = sum(round(float(score), 1) for score in grp_data['total'])
+        return {'total': final, 'pres': avg_pres, 'raw_sum': raw_sum}
         
     chung_1r = calc_group_metrics(scores_by_grp.get((1, 0)))
     chung_2r = calc_group_metrics(scores_by_grp.get((2, 0)))
@@ -840,13 +944,22 @@ def calc_pk_history_scores():
     elif hong_1r['total'] > 0:
         hong_final = hong_1r['total']
         
+    chung_pres = (chung_1r['pres'] + chung_2r['pres']) / 2 if chung_2r['total'] > 0 else chung_1r['pres']
+    hong_pres = (hong_1r['pres'] + hong_2r['pres']) / 2 if hong_2r['total'] > 0 else hong_1r['pres']
+    chung_raw = chung_1r['raw_sum'] + chung_2r['raw_sum']
+    hong_raw = hong_1r['raw_sum'] + hong_2r['raw_sum']
+
     return {
         'chung_1r': round(chung_1r['total'], 3),
         'chung_2r': round(chung_2r['total'], 3),
         'chung_final': round(chung_final, 3),
+        'chung_p': round(chung_pres, 3),
+        'chung_tot': round(chung_raw, 1),
         'hong_1r': round(hong_1r['total'], 3),
         'hong_2r': round(hong_2r['total'], 3),
-        'hong_final': round(hong_final, 3)
+        'hong_final': round(hong_final, 3),
+        'hong_p': round(hong_pres, 3),
+        'hong_tot': round(hong_raw, 1)
     }
 
 def stop_scoring(final_score="", rank=""):

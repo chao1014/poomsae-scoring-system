@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=3.0, user-scalable=yes, viewport-fit=cover">
     <title>品勢即時評分系統</title>
     
     <meta name="theme-color" content="#1a102f">
@@ -68,7 +68,7 @@
     <div id="waiting-screen" class="screen hidden">
         <!-- 頂部操作列：只保留連線狀態與全螢幕 -->
         <div class="waiting-header">
-            <button class="btn-change-judge" onclick="changeJudge()" style="font-size: clamp(12px, 2vh, 15px);">切換裁判</button>
+            <button class="btn-change-judge" onclick="changeJudge()" style="font-size: clamp(12px, 2svh, 15px);">切換裁判</button>
             <div class="connection-status" id="connection-status-text">
                 <span class="pulse-dot" style="background-color: var(--color-warning); box-shadow: 0 0 8px var(--color-warning);"></span>
                 連線中...
@@ -320,21 +320,21 @@
                 <p>等待統計分數...</p>
                 
                 <!-- 優化為三個分數並排區塊 -->
-                <div class="overlay-scores-container" style="display: flex; gap: clamp(8px, 1.5vw, 16px); justify-content: center; width: 100%; margin-top: clamp(8px, 1.5vh, 16px); margin-bottom: clamp(8px, 1.5vh, 16px);">
+                <div class="overlay-scores-container" style="display: flex; gap: clamp(8px, 1.5vw, 16px); justify-content: center; width: 100%; margin-top: clamp(8px, 1.5svh, 16px); margin-bottom: clamp(8px, 1.5svh, 16px);">
                     <!-- 正確性 -->
-                    <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: clamp(6px, 1.2vh, 12px) 0; display: flex; flex-direction: column; align-items: center;">
-                        <span style="font-size: clamp(11px, 2vh, 14px); color: var(--text-muted); font-weight: 600;">正確性</span>
-                        <span style="font-size: clamp(18px, 4.5vh, 28px); font-weight: 800; color: var(--color-danger); margin-top: 4px;" id="submitted-val-acc">0.0</span>
+                    <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: clamp(6px, 1.2svh, 12px) 0; display: flex; flex-direction: column; align-items: center;">
+                        <span style="font-size: clamp(11px, 2svh, 14px); color: var(--text-muted); font-weight: 600;">正確性</span>
+                        <span style="font-size: clamp(18px, 4.5svh, 28px); font-weight: 800; color: var(--color-danger); margin-top: 4px;" id="submitted-val-acc">0.0</span>
                     </div>
                     <!-- 表現性 -->
-                    <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: clamp(6px, 1.2vh, 12px) 0; display: flex; flex-direction: column; align-items: center;">
-                        <span style="font-size: clamp(11px, 2vh, 14px); color: var(--text-muted); font-weight: 600;">表現性</span>
-                        <span style="font-size: clamp(18px, 4.5vh, 28px); font-weight: 800; color: var(--color-info); margin-top: 4px;" id="submitted-val-pres">0.0</span>
+                    <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: clamp(6px, 1.2svh, 12px) 0; display: flex; flex-direction: column; align-items: center;">
+                        <span style="font-size: clamp(11px, 2svh, 14px); color: var(--text-muted); font-weight: 600;">表現性</span>
+                        <span style="font-size: clamp(18px, 4.5svh, 28px); font-weight: 800; color: var(--color-info); margin-top: 4px;" id="submitted-val-pres">0.0</span>
                     </div>
                     <!-- 總分 -->
-                    <div class="overlay-score-subbox" style="flex: 1; background: rgba(142, 88, 255, 0.08); border: 1px solid rgba(142, 88, 255, 0.2); border-radius: 12px; padding: clamp(6px, 1.2vh, 12px) 0; display: flex; flex-direction: column; align-items: center; box-shadow: 0 0 15px rgba(142, 88, 255, 0.15);">
-                        <span style="font-size: clamp(11px, 2vh, 14px); color: #fff; font-weight: 700; text-shadow: 0 0 5px rgba(255,255,255,0.2);">送出總分</span>
-                        <span style="font-size: clamp(18px, 4.5vh, 28px); font-weight: 900; color: var(--color-success); margin-top: 4px;" id="submitted-val-total">0.0</span>
+                    <div class="overlay-score-subbox" style="flex: 1; background: rgba(142, 88, 255, 0.08); border: 1px solid rgba(142, 88, 255, 0.2); border-radius: 12px; padding: clamp(6px, 1.2svh, 12px) 0; display: flex; flex-direction: column; align-items: center; box-shadow: 0 0 15px rgba(142, 88, 255, 0.15);">
+                        <span style="font-size: clamp(11px, 2svh, 14px); color: #fff; font-weight: 700; text-shadow: 0 0 5px rgba(255,255,255,0.2);">送出總分</span>
+                        <span style="font-size: clamp(18px, 4.5svh, 28px); font-weight: 900; color: var(--color-success); margin-top: 4px;" id="submitted-val-total">0.0</span>
                     </div>
                 </div>
                 <div id="final-result-box" class="final-result-box hidden">
@@ -351,42 +351,42 @@
                 <!-- PK 交叉/依序上場 對決分數顯示面板 -->
                 <div id="pk-result-box" class="pk-result-box hidden" style="margin-top: 15px; width: 100%;">
                     <!-- 1R 分數對決 -->
-                    <div id="pk-res-r1-row" style="display: flex; justify-content: space-around; background: rgba(255,255,255,0.04); padding: clamp(8px, 1.5vh, 16px); border-radius: 12px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.06);">
+                    <div id="pk-res-r1-row" style="display: flex; justify-content: space-around; background: rgba(255,255,255,0.04); padding: clamp(8px, 1.5svh, 16px); border-radius: 12px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.06);">
                         <div style="text-align: center; flex: 1;">
-                            <div style="color: #00ccff; font-weight: 700; font-size: clamp(12px, 2vh, 15px);">🔵 青方 1R</div>
-                            <div id="pk-res-chung-r1" style="font-size: clamp(20px, 4.5vh, 28px); font-weight: 800; color: #fff; margin-top: 4px;">0.00</div>
+                            <div style="color: #00ccff; font-weight: 700; font-size: clamp(12px, 2svh, 15px);">🔵 青方 1R</div>
+                            <div id="pk-res-chung-r1" style="font-size: clamp(20px, 4.5svh, 28px); font-weight: 800; color: #fff; margin-top: 4px;">0.00</div>
                         </div>
                         <div style="text-align: center; flex: 1; border-left: 1px solid rgba(255,255,255,0.08);">
-                            <div style="color: #ff3366; font-weight: 700; font-size: clamp(12px, 2vh, 15px);">🔴 紅方 1R</div>
-                            <div id="pk-res-hong-r1" style="font-size: clamp(20px, 4.5vh, 28px); font-weight: 800; color: #fff; margin-top: 4px;">0.00</div>
+                            <div style="color: #ff3366; font-weight: 700; font-size: clamp(12px, 2svh, 15px);">🔴 紅方 1R</div>
+                            <div id="pk-res-hong-r1" style="font-size: clamp(20px, 4.5svh, 28px); font-weight: 800; color: #fff; margin-top: 4px;">0.00</div>
                         </div>
                     </div>
                     <!-- 2R 與最終得分對決 (2R 結束時顯示) -->
                     <div id="pk-res-r2-board" class="hidden">
-                        <div style="display: flex; justify-content: space-around; background: rgba(255,255,255,0.04); padding: clamp(8px, 1.5vh, 16px); border-radius: 12px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.06);">
+                        <div style="display: flex; justify-content: space-around; background: rgba(255,255,255,0.04); padding: clamp(8px, 1.5svh, 16px); border-radius: 12px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.06);">
                             <div style="text-align: center; flex: 1;">
-                                <div style="color: #00ccff; font-weight: 700; font-size: clamp(12px, 2vh, 15px);">🔵 青方 2R</div>
-                                <div id="pk-res-chung-r2" style="font-size: clamp(20px, 4.5vh, 28px); font-weight: 800; color: #fff; margin-top: 4px;">0.00</div>
+                                <div style="color: #00ccff; font-weight: 700; font-size: clamp(12px, 2svh, 15px);">🔵 青方 2R</div>
+                                <div id="pk-res-chung-r2" style="font-size: clamp(20px, 4.5svh, 28px); font-weight: 800; color: #fff; margin-top: 4px;">0.00</div>
                             </div>
                             <div style="text-align: center; flex: 1; border-left: 1px solid rgba(255,255,255,0.08);">
-                                <div style="color: #ff3366; font-weight: 700; font-size: clamp(12px, 2vh, 15px);">🔴 紅方 2R</div>
-                                <div id="pk-res-hong-r2" style="font-size: clamp(20px, 4.5vh, 28px); font-weight: 800; color: #fff; margin-top: 4px;">0.00</div>
+                                <div style="color: #ff3366; font-weight: 700; font-size: clamp(12px, 2svh, 15px);">🔴 紅方 2R</div>
+                                <div id="pk-res-hong-r2" style="font-size: clamp(20px, 4.5svh, 28px); font-weight: 800; color: #fff; margin-top: 4px;">0.00</div>
                             </div>
                         </div>
-                        <div style="display: flex; justify-content: space-around; background: rgba(142, 88, 255, 0.08); padding: clamp(8px, 1.5vh, 16px); border-radius: 12px; border: 1px solid rgba(142, 88, 255, 0.2); box-shadow: 0 0 15px rgba(142, 88, 255, 0.1);">
+                        <div style="display: flex; justify-content: space-around; background: rgba(142, 88, 255, 0.08); padding: clamp(8px, 1.5svh, 16px); border-radius: 12px; border: 1px solid rgba(142, 88, 255, 0.2); box-shadow: 0 0 15px rgba(142, 88, 255, 0.1);">
                             <div style="text-align: center; flex: 1;">
-                                <div style="color: #00ccff; font-weight: 900; font-size: clamp(12px, 2vh, 15px); text-shadow: 0 0 5px rgba(0,204,255,0.2);">🔵 青方 最終</div>
-                                <div id="pk-res-chung-final" style="font-size: clamp(22px, 5vh, 32px); font-weight: 900; color: #00ccff; margin-top: 4px;">0.000</div>
+                                <div style="color: #00ccff; font-weight: 900; font-size: clamp(12px, 2svh, 15px); text-shadow: 0 0 5px rgba(0,204,255,0.2);">🔵 青方 最終</div>
+                                <div id="pk-res-chung-final" style="font-size: clamp(22px, 5svh, 32px); font-weight: 900; color: #00ccff; margin-top: 4px;">0.000</div>
                             </div>
                             <div style="text-align: center; flex: 1; border-left: 1px solid rgba(255,255,255,0.08);">
-                                <div style="color: #ff3366; font-weight: 900; font-size: clamp(12px, 2vh, 15px); text-shadow: 0 0 5px rgba(255,51,102,0.2);">🔴 紅方 最終</div>
-                                <div id="pk-res-hong-final" style="font-size: clamp(22px, 5vh, 32px); font-weight: 900; color: #ff3366; margin-top: 4px;">0.000</div>
+                                <div style="color: #ff3366; font-weight: 900; font-size: clamp(12px, 2svh, 15px); text-shadow: 0 0 5px rgba(255,51,102,0.2);">🔴 紅方 最終</div>
+                                <div id="pk-res-hong-final" style="font-size: clamp(22px, 5svh, 32px); font-weight: 900; color: #ff3366; margin-top: 4px;">0.000</div>
                             </div>
                         </div>
                     </div>
                     <!-- 獲勝方顯示 -->
-                    <div id="pk-res-winner-row" class="hidden" style="margin-top: 12px; text-align: center; background: rgba(0, 0, 0, 0.25); padding: clamp(6px, 1.2vh, 10px); border-radius: 10px; border: 1px dashed rgba(255, 255, 255, 0.15); box-shadow: inset 0 0 10px rgba(0,0,0,0.5);">
-                        <span id="pk-res-winner-text" style="font-size: clamp(15px, 3.2vh, 20px); font-weight: 900; color: #f1c40f; text-shadow: 0 0 10px rgba(241,196,15,0.3);">---</span>
+                    <div id="pk-res-winner-row" class="hidden" style="margin-top: 12px; text-align: center; background: rgba(0, 0, 0, 0.25); padding: clamp(6px, 1.2svh, 10px); border-radius: 10px; border: 1px dashed rgba(255, 255, 255, 0.15); box-shadow: inset 0 0 10px rgba(0,0,0,0.5);">
+                        <span id="pk-res-winner-text" style="font-size: clamp(15px, 3.2svh, 20px); font-weight: 900; color: #f1c40f; text-shadow: 0 0 10px rgba(241,196,15,0.3);">---</span>
                     </div>
                 </div>
                 <button id="btn-modify-score" class="btn-modify-score" onclick="modifySubmittedScore()">
@@ -649,50 +649,50 @@
                 
                 <!-- 青方送出分數總覽 -->
                 <div style="text-align: left; width: 100%; margin-bottom: 16px;">
-                    <div style="font-size: clamp(13px, 2.2vh, 16px); color: var(--color-info); font-weight: 800; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    <div style="font-size: clamp(13px, 2.2svh, 16px); color: var(--color-info); font-weight: 800; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
                         <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: var(--color-info);"></span>
                         青方分數
                     </div>
                     <div class="overlay-scores-container" style="display: flex; gap: clamp(8px, 1.5vw, 16px); justify-content: center; width: 100%;">
                         <!-- 青方 正確性 -->
-                        <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: clamp(6px, 1.2vh, 12px) 0; display: flex; flex-direction: column; align-items: center;">
-                            <span style="font-size: clamp(11px, 2vh, 14px); color: var(--text-muted); font-weight: 600;">正確性</span>
-                            <span style="font-size: clamp(18px, 4.5vh, 26px); font-weight: 800; color: var(--color-danger); margin-top: 4px;" id="pk-submitted-chung-acc">0.0</span>
+                        <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: clamp(6px, 1.2svh, 12px) 0; display: flex; flex-direction: column; align-items: center;">
+                            <span style="font-size: clamp(11px, 2svh, 14px); color: var(--text-muted); font-weight: 600;">正確性</span>
+                            <span style="font-size: clamp(18px, 4.5svh, 26px); font-weight: 800; color: var(--color-danger); margin-top: 4px;" id="pk-submitted-chung-acc">0.0</span>
                         </div>
                         <!-- 青方 表現性 -->
-                        <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: clamp(6px, 1.2vh, 12px) 0; display: flex; flex-direction: column; align-items: center;">
-                            <span style="font-size: clamp(11px, 2vh, 14px); color: var(--text-muted); font-weight: 600;">表現性</span>
-                            <span style="font-size: clamp(18px, 4.5vh, 26px); font-weight: 800; color: var(--color-info); margin-top: 4px;" id="pk-submitted-chung-pres">0.0</span>
+                        <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: clamp(6px, 1.2svh, 12px) 0; display: flex; flex-direction: column; align-items: center;">
+                            <span style="font-size: clamp(11px, 2svh, 14px); color: var(--text-muted); font-weight: 600;">表現性</span>
+                            <span style="font-size: clamp(18px, 4.5svh, 26px); font-weight: 800; color: var(--color-info); margin-top: 4px;" id="pk-submitted-chung-pres">0.0</span>
                         </div>
                         <!-- 青方 總分 -->
-                        <div class="overlay-score-subbox" style="flex: 1; background: rgba(0, 204, 255, 0.08); border: 1px solid rgba(0, 204, 255, 0.2); border-radius: 12px; padding: clamp(6px, 1.2vh, 12px) 0; display: flex; flex-direction: column; align-items: center; box-shadow: 0 0 15px rgba(0, 204, 255, 0.15);">
-                            <span style="font-size: clamp(11px, 2vh, 14px); color: #fff; font-weight: 700; text-shadow: 0 0 5px rgba(255,255,255,0.2);">送出總分</span>
-                            <span style="font-size: clamp(18px, 4.5vh, 26px); font-weight: 900; color: var(--color-info); margin-top: 4px;" id="pk-submitted-chung-total">0.0</span>
+                        <div class="overlay-score-subbox" style="flex: 1; background: rgba(0, 204, 255, 0.08); border: 1px solid rgba(0, 204, 255, 0.2); border-radius: 12px; padding: clamp(6px, 1.2svh, 12px) 0; display: flex; flex-direction: column; align-items: center; box-shadow: 0 0 15px rgba(0, 204, 255, 0.15);">
+                            <span style="font-size: clamp(11px, 2svh, 14px); color: #fff; font-weight: 700; text-shadow: 0 0 5px rgba(255,255,255,0.2);">送出總分</span>
+                            <span style="font-size: clamp(18px, 4.5svh, 26px); font-weight: 900; color: var(--color-info); margin-top: 4px;" id="pk-submitted-chung-total">0.0</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- 紅方送出分數總覽 -->
                 <div style="text-align: left; width: 100%; margin-bottom: 20px;">
-                    <div style="font-size: clamp(13px, 2.2vh, 16px); color: var(--color-danger); font-weight: 800; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    <div style="font-size: clamp(13px, 2.2svh, 16px); color: var(--color-danger); font-weight: 800; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
                         <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: var(--color-danger);"></span>
                         紅方分數
                     </div>
                     <div class="overlay-scores-container" style="display: flex; gap: clamp(8px, 1.5vw, 16px); justify-content: center; width: 100%;">
                         <!-- 紅方 正確性 -->
-                        <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: clamp(6px, 1.2vh, 12px) 0; display: flex; flex-direction: column; align-items: center;">
-                            <span style="font-size: clamp(11px, 2vh, 14px); color: var(--text-muted); font-weight: 600;">正確性</span>
-                            <span style="font-size: clamp(18px, 4.5vh, 26px); font-weight: 800; color: var(--color-danger); margin-top: 4px;" id="pk-submitted-hong-acc">0.0</span>
+                        <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: clamp(6px, 1.2svh, 12px) 0; display: flex; flex-direction: column; align-items: center;">
+                            <span style="font-size: clamp(11px, 2svh, 14px); color: var(--text-muted); font-weight: 600;">正確性</span>
+                            <span style="font-size: clamp(18px, 4.5svh, 26px); font-weight: 800; color: var(--color-danger); margin-top: 4px;" id="pk-submitted-hong-acc">0.0</span>
                         </div>
                         <!-- 紅方 表現性 -->
-                        <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: clamp(6px, 1.2vh, 12px) 0; display: flex; flex-direction: column; align-items: center;">
-                            <span style="font-size: clamp(11px, 2vh, 14px); color: var(--text-muted); font-weight: 600;">表現性</span>
-                            <span style="font-size: clamp(18px, 4.5vh, 26px); font-weight: 800; color: var(--color-info); margin-top: 4px;" id="pk-submitted-hong-pres">0.0</span>
+                        <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: clamp(6px, 1.2svh, 12px) 0; display: flex; flex-direction: column; align-items: center;">
+                            <span style="font-size: clamp(11px, 2svh, 14px); color: var(--text-muted); font-weight: 600;">表現性</span>
+                            <span style="font-size: clamp(18px, 4.5svh, 26px); font-weight: 800; color: var(--color-info); margin-top: 4px;" id="pk-submitted-hong-pres">0.0</span>
                         </div>
                         <!-- 紅方 總分 -->
-                        <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 51, 102, 0.08); border: 1px solid rgba(255, 51, 102, 0.2); border-radius: 12px; padding: clamp(6px, 1.2vh, 12px) 0; display: flex; flex-direction: column; align-items: center; box-shadow: 0 0 15px rgba(255, 51, 102, 0.15);">
-                            <span style="font-size: clamp(11px, 2vh, 14px); color: #fff; font-weight: 700; text-shadow: 0 0 5px rgba(255,255,255,0.2);">送出總分</span>
-                            <span style="font-size: clamp(18px, 4.5vh, 26px); font-weight: 900; color: var(--color-danger); margin-top: 4px;" id="pk-submitted-hong-total">0.0</span>
+                        <div class="overlay-score-subbox" style="flex: 1; background: rgba(255, 51, 102, 0.08); border: 1px solid rgba(255, 51, 102, 0.2); border-radius: 12px; padding: clamp(6px, 1.2svh, 12px) 0; display: flex; flex-direction: column; align-items: center; box-shadow: 0 0 15px rgba(255, 51, 102, 0.15);">
+                            <span style="font-size: clamp(11px, 2svh, 14px); color: #fff; font-weight: 700; text-shadow: 0 0 5px rgba(255,255,255,0.2);">送出總分</span>
+                            <span style="font-size: clamp(18px, 4.5svh, 26px); font-weight: 900; color: var(--color-danger); margin-top: 4px;" id="pk-submitted-hong-total">0.0</span>
                         </div>
                     </div>
                 </div>
@@ -797,9 +797,9 @@
             animation: flash-row-bg 1s infinite;
         }
     </style>
-    <div id="ranking-screen" class="screen hidden" style="background-color: #000000; padding: 0; display: flex; flex-direction: column; overflow: hidden; align-items: stretch; justify-content: flex-start; z-index: 9999; position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh;">
-        <div style="height: 15vh; display: flex; align-items: center; justify-content: center;">
-            <h1 id="ranking-screen-title" style="font-family: 'Microsoft JhengHei', sans-serif; font-size: clamp(24px, 5vh, 48px); font-weight: bold; color: white; margin: 0; text-align: center;">目前賽事排行榜</h1>
+    <div id="ranking-screen" class="screen hidden" style="background-color: #000000; padding: 0; display: flex; flex-direction: column; overflow: hidden; align-items: stretch; justify-content: flex-start; z-index: 9999; position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100svh;">
+        <div style="height: 15svh; display: flex; align-items: center; justify-content: center;">
+            <h1 id="ranking-screen-title" style="font-family: 'Microsoft JhengHei', sans-serif; font-size: clamp(24px, 5svh, 48px); font-weight: bold; color: white; margin: 0; text-align: center;">目前賽事排行榜</h1>
         </div>
         <div id="ranking-tbody" style="flex: 1; display: flex; flex-direction: column; width: 100%; margin: 0; padding: 0; box-sizing: border-box; overflow-y: auto; overflow-x: hidden;">
             <!-- JS 動態生成 -->

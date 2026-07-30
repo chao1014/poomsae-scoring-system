@@ -244,7 +244,8 @@ def run_pyinstaller(script_name, exe_name, is_gui=False):
             if os.path.exists(src_file):
                 shutil.move(src_file, os.path.join(pkg_tools_dst, lic_file))
                 
-        use_obfuscated = True
+        # 強制停用 PyArmor 以避免 DLL load failed 問題
+        use_obfuscated = False
     except Exception as e:
         print(f"  - [WARN] 該腳本混淆加固失敗 (原因: 免費版 PyArmor 檔案大小限制或環境問題)。")
         print(f"  - [WARN] 系統將自動降級為標準 PyInstaller 安全打包流程...")

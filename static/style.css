@@ -15,12 +15,12 @@
     --font-outfit: 'Outfit', 'Noto Sans TC', sans-serif;
 
     /* 響應式佈局變數 - 依螢幕高度與寬度動態調整大小與間距，保證無捲軸 */
-    --padding-screen: clamp(6px, 1.5vh, 16px) clamp(10px, 1.5vw, 24px);
-    --gap-layout: clamp(6px, 1.2vh, 12px);
-    --font-size-title: clamp(16px, 3.8vh, 24px);
-    --font-size-body: clamp(11px, 2.2vh, 15px);
-    --font-size-score-val: clamp(20px, 4.8vh, 32px);
-    --font-size-btn-text: clamp(13px, 2.8vh, 18px);
+    --padding-screen: clamp(6px, 1.5svh, 16px) clamp(10px, 1.5vw, 24px);
+    --gap-layout: clamp(6px, 1.2svh, 12px);
+    --font-size-title: clamp(16px, 3.8svh, 24px);
+    --font-size-body: clamp(11px, 2.2svh, 15px);
+    --font-size-score-val: clamp(20px, 4.8svh, 32px);
+    --font-size-btn-text: clamp(13px, 2.8svh, 18px);
 }
 
 * {
@@ -40,7 +40,7 @@ html, body {
     left: 0;
     bottom: 0;
     right: 0;
-    touch-action: none; /* 禁用全網頁橡皮筋回彈與手勢滾動 */
+    touch-action: pinch-zoom; /* 保留固定評分版面，但允許裁判手動縮放復原 */
 }
 
 body {
@@ -96,7 +96,7 @@ body {
 /* 扣分計數設定最小寬度，防止數字變更時容器左右搖晃，預先保留雙位數寬度防止抖動 */
 #cnt-minor,
 #cnt-major {
-    min-width: clamp(28px, 5vh, 44px);
+    min-width: clamp(28px, 5svh, 44px);
 }
 
 /* 總分設定最小寬度，且靠左對齊，防範數值寬度稍微變動推擠其他按鈕 */
@@ -110,16 +110,16 @@ body {
    ========================================== */
 .brand-header {
     text-align: center;
-    margin-top: clamp(2vh, 4vh, 6vh);
-    margin-bottom: clamp(2vh, 4vh, 6vh);
+    margin-top: clamp(2svh, 4svh, 6svh);
+    margin-bottom: clamp(2svh, 4svh, 6svh);
     position: relative;
     z-index: 10;
 }
 
 .logo-placeholder {
-    width: clamp(50px, 12vh, 100px);
-    height: clamp(50px, 12vh, 100px);
-    margin: 0 auto clamp(10px, 2vh, 20px) auto;
+    width: clamp(50px, 12svh, 100px);
+    height: clamp(50px, 12svh, 100px);
+    margin: 0 auto clamp(10px, 2svh, 20px) auto;
     filter: drop-shadow(0 0 20px rgba(142, 88, 255, 0.6));
     animation: floatGlow 4s ease-in-out infinite;
     display: block;
@@ -132,7 +132,7 @@ body {
 }
 
 .brand-header h1 {
-    font-size: clamp(24px, 5vh, 36px);
+    font-size: clamp(24px, 5svh, 36px);
     font-weight: 900;
     margin: 0 0 8px 0;
     background: linear-gradient(135deg, #ffffff 0%, #a385ff 50%, #00ccff 100%);
@@ -151,7 +151,7 @@ body {
 }
 
 .brand-header p {
-    font-size: clamp(14px, 2.5vh, 18px);
+    font-size: clamp(14px, 2.5svh, 18px);
     color: var(--text-muted);
     margin: 0;
     letter-spacing: 1px;
@@ -161,7 +161,7 @@ body {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: clamp(10px, 2vw, 20px);
-    margin-bottom: clamp(16px, 4vh, 32px);
+    margin-bottom: clamp(16px, 4svh, 32px);
     padding: 0 clamp(10px, 2vw, 30px);
     position: relative;
     z-index: 10;
@@ -175,9 +175,9 @@ body {
     border-radius: 16px;
     color: var(--text-main);
     font-family: var(--font-outfit);
-    font-size: clamp(16px, 3.5vh, 28px);
+    font-size: clamp(16px, 3.5svh, 28px);
     font-weight: 800;
-    padding: clamp(20px, 5vh, 40px) 0;
+    padding: clamp(20px, 5svh, 40px) 0;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
@@ -227,7 +227,7 @@ body {
 .btn-judge-select.connected::after {
     content: '已連線';
     display: block;
-    font-size: clamp(10px, 2vh, 14px);
+    font-size: clamp(10px, 2svh, 14px);
     font-weight: 600;
     margin-top: 4px;
     color: var(--color-success);
@@ -237,7 +237,7 @@ body {
 .custom-login-container {
     text-align: center;
     margin-top: auto;
-    margin-bottom: 2vh;
+    margin-bottom: 2svh;
 }
 
 .btn-toggle-custom {
@@ -298,7 +298,7 @@ input[type="text"]:focus {
     flex-shrink: 0;
     position: relative;
     z-index: 10;
-    padding-bottom: clamp(10px, 2vh, 20px);
+    padding-bottom: clamp(10px, 2svh, 20px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -314,8 +314,8 @@ input[type="text"]:focus {
 }
 
 .pulse-dot {
-    width: clamp(7px, 1.3vh, 10px);
-    height: clamp(7px, 1.3vh, 10px);
+    width: clamp(7px, 1.3svh, 10px);
+    height: clamp(7px, 1.3svh, 10px);
     background-color: var(--color-success);
     border-radius: 50%;
     box-shadow: 0 0 8px var(--color-success);
@@ -334,7 +334,7 @@ input[type="text"]:focus {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    gap: clamp(20px, 4vh, 40px);
+    gap: clamp(20px, 4svh, 40px);
     position: relative;
     z-index: 10;
 }
@@ -344,11 +344,11 @@ input[type="text"]:focus {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: clamp(6px, 1.2vh, 12px);
+    gap: clamp(6px, 1.2svh, 12px);
 }
 
 .waiting-judge-label {
-    font-size: clamp(13px, 2.2vh, 17px);
+    font-size: clamp(13px, 2.2svh, 17px);
     color: rgba(163, 156, 181, 0.7);
     font-weight: 600;
     letter-spacing: 2px;
@@ -356,7 +356,7 @@ input[type="text"]:focus {
 }
 
 .waiting-judge-id {
-    font-size: clamp(64px, 16vh, 128px);
+    font-size: clamp(64px, 16svh, 128px);
     font-weight: 900;
     line-height: 1;
     color: #ffffff;
@@ -392,14 +392,14 @@ input[type="text"]:focus {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: clamp(6px, 1.2vh, 10px);
+    gap: clamp(6px, 1.2svh, 10px);
     text-align: center;
 }
 
 /* 時鐘圖示已移除 */
 
 .waiting-status-text {
-    font-size: clamp(18px, 3.5vh, 26px);
+    font-size: clamp(18px, 3.5svh, 26px);
     font-weight: 700;
     color: rgba(255, 255, 255, 0.85);
     margin: 0;
@@ -407,7 +407,7 @@ input[type="text"]:focus {
 }
 
 .waiting-status-sub {
-    font-size: clamp(13px, 2.2vh, 16px);
+    font-size: clamp(13px, 2.2svh, 16px);
     color: rgba(163, 156, 181, 0.6);
     margin: 0;
     letter-spacing: 0.2px;
@@ -426,7 +426,7 @@ input[type="text"]:focus {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    padding: clamp(14px, 2.5vh, 22px) clamp(20px, 4vw, 32px);
+    padding: clamp(14px, 2.5svh, 22px) clamp(20px, 4vw, 32px);
     gap: clamp(12px, 2vw, 24px);
 }
 
@@ -437,7 +437,7 @@ input[type="text"]:focus {
 }
 
 .waiting-info-label {
-    font-size: clamp(13px, 2.2vh, 16px);
+    font-size: clamp(13px, 2.2svh, 16px);
     color: rgba(163, 156, 181, 0.6);
     font-weight: 500;
     letter-spacing: 0.3px;
@@ -446,7 +446,7 @@ input[type="text"]:focus {
 }
 
 .waiting-info-value {
-    font-size: clamp(15px, 2.8vh, 20px);
+    font-size: clamp(15px, 2.8svh, 20px);
     font-weight: 700;
     color: rgba(255, 255, 255, 0.9);
     letter-spacing: 0.2px;
@@ -478,7 +478,7 @@ input[type="text"]:focus {
     flex: 1;
     gap: var(--gap-layout);
     min-height: 0; /* 允許子容器在 Flex 彈性容器中縮小 */
-    margin-bottom: clamp(4px, 1vh, 8px);
+    margin-bottom: clamp(4px, 1svh, 8px);
 }
 
 /* 自由品勢模式下的網格樣式（隱藏兩側，中欄 100% 寬） */
@@ -498,7 +498,7 @@ input[type="text"]:focus {
     background: var(--bg-panel);
     border: 1.5px solid var(--bg-panel-border);
     border-radius: 16px;
-    padding: clamp(6px, 1.2vh, 12px) clamp(4px, 1vw, 10px);
+    padding: clamp(6px, 1.2svh, 12px) clamp(4px, 1vw, 10px);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     height: 100%;
     box-sizing: border-box;
@@ -506,7 +506,7 @@ input[type="text"]:focus {
 }
 
 .count-display-header {
-    font-size: clamp(10px, 2.2vh, 13px);
+    font-size: clamp(10px, 2.2svh, 13px);
     color: var(--text-muted);
     font-weight: 700;
     text-align: center;
@@ -538,7 +538,7 @@ input[type="text"]:focus {
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: clamp(24px, 6vh, 40px);
+    font-size: clamp(24px, 6svh, 40px);
     font-weight: 900;
     color: white;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
@@ -570,7 +570,7 @@ input[type="text"]:focus {
     background: rgba(0, 0, 0, 0.4);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
-    padding: clamp(2px, 0.5vh, 6px) clamp(6px, 1.2vw, 14px);
+    padding: clamp(2px, 0.5svh, 6px) clamp(6px, 1.2vw, 14px);
     margin: 0;
     letter-spacing: 0.5px;
     min-width: clamp(110px, 13vw, 160px); /* 配合雙位數寬度加寬，防止突然變寬 */
@@ -597,7 +597,7 @@ input[type="text"]:focus {
     border-radius: 8px; /* 改為 8px 長方形圓角 */
     color: var(--color-warning);
     flex: 1; /* 佔滿剩餘水平空間 */
-    height: clamp(30px, 6vh, 46px);
+    height: clamp(30px, 6svh, 46px);
     cursor: pointer;
     display: flex;
     justify-content: center;
@@ -636,7 +636,7 @@ input[type="text"]:focus {
     background: var(--bg-panel);
     border: 1.5px solid var(--bg-panel-border);
     border-radius: 16px;
-    padding: clamp(6px, 1.2vh, 14px) clamp(10px, 1.5vw, 20px);
+    padding: clamp(6px, 1.2svh, 14px) clamp(10px, 1.5vw, 20px);
     margin-bottom: 0;
     box-sizing: border-box;
 }
@@ -657,14 +657,14 @@ input[type="text"]:focus {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: clamp(4px, 0.8vh, 10px);
+    margin-bottom: clamp(4px, 0.8svh, 10px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    padding-bottom: clamp(3px, 0.6vh, 8px);
+    padding-bottom: clamp(3px, 0.6svh, 8px);
     flex-shrink: 0;
 }
 
 .panel-header h3 {
-    font-size: clamp(12px, 2.5vh, 16px);
+    font-size: clamp(12px, 2.5svh, 16px);
     font-weight: 700;
     margin: 0;
     letter-spacing: 0.5px;
@@ -685,7 +685,7 @@ input[type="text"]:focus {
 }
 
 .max-score {
-    font-size: clamp(10px, 1.8vh, 12px);
+    font-size: clamp(10px, 1.8svh, 12px);
     color: var(--text-muted);
     font-weight: 400;
 }
@@ -724,7 +724,7 @@ input[type="text"]:focus {
     grid-template-columns: 1fr;
     grid-template-rows: repeat(3, 1fr); /* 均分 3 個子項目高度 */
     flex: 1;
-    gap: clamp(4px, 0.8vh, 8px);
+    gap: clamp(4px, 0.8svh, 8px);
     min-height: 0;
 }
 
@@ -732,7 +732,7 @@ input[type="text"]:focus {
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 10px;
-    padding: clamp(3px, 0.8vh, 10px) clamp(8px, 1.2vw, 16px);
+    padding: clamp(3px, 0.8svh, 10px) clamp(8px, 1.2vw, 16px);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -757,7 +757,7 @@ input[type="text"]:focus {
 }
 
 .pres-val-display {
-    font-size: clamp(14px, 3vh, 22px);
+    font-size: clamp(14px, 3svh, 22px);
     font-weight: 800;
     color: var(--color-info);
 }
@@ -771,10 +771,10 @@ input[type="text"]:focus {
     background: rgba(255, 255, 255, 0.06);
     border: 1.5px solid rgba(255, 255, 255, 0.1);
     color: var(--text-main);
-    width: clamp(26px, 5.5vh, 40px);
-    height: clamp(26px, 5.5vh, 40px);
+    width: clamp(26px, 5.5svh, 40px);
+    height: clamp(26px, 5.5svh, 40px);
     border-radius: 50%;
-    font-size: clamp(14px, 3vh, 24px);
+    font-size: clamp(14px, 3svh, 24px);
     font-weight: 600;
     cursor: pointer;
     display: flex;
@@ -844,11 +844,11 @@ input[type="text"]:focus {
     flex-direction: column;
     height: 100%;
     min-height: 0;
-    gap: clamp(4px, 0.8vh, 8px);
+    gap: clamp(4px, 0.8svh, 8px);
 }
 
 .freestyle-section-title {
-    font-size: clamp(10px, 2.2vh, 13px);
+    font-size: clamp(10px, 2.2svh, 13px);
     font-weight: 700;
     color: var(--color-success);
     letter-spacing: 0.5px;
@@ -862,7 +862,7 @@ input[type="text"]:focus {
     grid-template-columns: 1fr 1fr;
     grid-template-rows: repeat(3, 1fr);
     flex: 1;
-    gap: clamp(4px, 0.8vh, 8px);
+    gap: clamp(4px, 0.8svh, 8px);
     min-height: 0;
 }
 
@@ -872,7 +872,7 @@ input[type="text"]:focus {
     grid-template-columns: 1fr 1fr;
     grid-template-rows: repeat(2, 1fr);
     flex: 1;
-    gap: clamp(4px, 0.8vh, 8px);
+    gap: clamp(4px, 0.8svh, 8px);
     min-height: 0;
 }
 
@@ -901,12 +901,12 @@ input[type="text"]:focus {
     background: var(--bg-panel);
     border: 1.5px solid var(--bg-panel-border);
     border-radius: 14px;
-    padding: clamp(6px, 1.2vh, 14px) clamp(12px, 1.5vw, 24px);
-    margin-bottom: clamp(4px, 1vh, 10px);
+    padding: clamp(6px, 1.2svh, 14px) clamp(12px, 1.5vw, 24px);
+    margin-bottom: clamp(4px, 1svh, 10px);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     display: flex;
     flex-direction: column;
-    gap: clamp(4px, 1vh, 12px);
+    gap: clamp(4px, 1svh, 12px);
 }
 
 .info-line-one {
@@ -924,18 +924,18 @@ input[type="text"]:focus {
 }
 
 .info-item-label {
-    font-size: clamp(14px, 3vh, 22px);
+    font-size: clamp(14px, 3svh, 22px);
     color: var(--text-muted);
 }
 
 .info-item-value {
     color: #fff;
     font-weight: 700;
-    font-size: clamp(14px, 3vh, 22px);
+    font-size: clamp(14px, 3svh, 22px);
 }
 
 .info-highlight-name {
-    font-size: clamp(14px, 3vh, 22px);
+    font-size: clamp(14px, 3svh, 22px);
     color: var(--color-info);
     text-shadow: 0 0 10px rgba(0, 204, 255, 0.3);
 }
@@ -946,7 +946,7 @@ input[type="text"]:focus {
     align-items: center;
     width: 100%;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
-    padding-top: clamp(4px, 0.8vh, 12px);
+    padding-top: clamp(4px, 0.8svh, 12px);
 }
 
 .info-player-metadata {
@@ -967,9 +967,9 @@ input[type="text"]:focus {
     gap: 4px;
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    padding: clamp(3px, 0.6vh, 8px) clamp(8px, 1.2vw, 18px);
+    padding: clamp(3px, 0.6svh, 8px) clamp(8px, 1.2vw, 18px);
     border-radius: 8px;
-    font-size: clamp(14px, 3vh, 22px);
+    font-size: clamp(14px, 3svh, 22px);
     font-weight: 700;
     color: var(--text-muted);
     transition: all 0.3s ease;
@@ -988,7 +988,7 @@ input[type="text"]:focus {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: clamp(6px, 1.2vh, 12px) clamp(10px, 1.5vw, 20px);
+    padding: clamp(6px, 1.2svh, 12px) clamp(10px, 1.5vw, 20px);
     background: rgba(22, 15, 38, 0.85);
     border: 1.5px solid var(--bg-panel-border);
     border-radius: 14px;
@@ -1008,9 +1008,9 @@ input[type="text"]:focus {
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 8px;
     color: var(--text-muted);
-    font-size: clamp(10px, 2.2vh, 14px);
+    font-size: clamp(10px, 2.2svh, 14px);
     font-weight: 700;
-    padding: clamp(3px, 0.6vh, 6px) clamp(6px, 1vw, 12px);
+    padding: clamp(3px, 0.6svh, 6px) clamp(6px, 1vw, 12px);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -1032,7 +1032,7 @@ input[type="text"]:focus {
 }
 
 .inline-total-score .score-lbl {
-    font-size: clamp(10px, 2vh, 12px);
+    font-size: clamp(10px, 2svh, 12px);
     color: var(--text-muted);
 }
 
@@ -1050,7 +1050,7 @@ input[type="text"]:focus {
     color: #000;
     font-size: var(--font-size-btn-text);
     font-weight: 800;
-    padding: clamp(6px, 1vh, 12px) clamp(16px, 2vw, 26px);
+    padding: clamp(6px, 1svh, 12px) clamp(16px, 2vw, 26px);
     cursor: pointer;
     box-shadow: 0 0 12px rgba(57, 255, 20, 0.3);
     transition: all 0.2s ease;
@@ -1288,7 +1288,7 @@ input[type="text"]:focus {
    ========================================== */
 .pwa-tip {
     text-align: center;
-    margin-top: clamp(4px, 1.2vh, 12px);
+    margin-top: clamp(4px, 1.2svh, 12px);
     padding: 0 15px;
     opacity: 0.85;
 }
@@ -1314,7 +1314,7 @@ input[type="text"]:focus {
     top: 0;
     left: 0;
     width: 100vw;
-    height: 100vh;
+    height: 100svh;
     background: radial-gradient(circle at 50% 50%, #150d26 0%, #07040f 100%);
     z-index: 99999;
     display: none;
@@ -1381,7 +1381,7 @@ input[type="text"]:focus {
     }
     .btn-judge-select {
         border-radius: 8px;
-        padding: clamp(8px, 2.5vh, 16px) 0; /* 小高度設備下微調內距，避免縱向空間溢出 */
+        padding: clamp(8px, 2.5svh, 16px) 0; /* 小高度設備下微調內距，避免縱向空間溢出 */
     }
     
     /* 登入畫面 logo 與 header 微調 */
@@ -1416,7 +1416,7 @@ input[type="text"]:focus {
     top: 0;
     left: 0;
     width: 100vw;
-    height: 100vh;
+    height: 100svh;
     background: rgba(7, 4, 15, 0.85);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -1520,9 +1520,9 @@ input[type="text"]:focus {
     border-radius: 8px;
     color: #cbb3ff;
     font-family: var(--font-outfit);
-    font-size: clamp(10px, 2.2vh, 14px);
+    font-size: clamp(10px, 2.2svh, 14px);
     font-weight: 700;
-    padding: clamp(3px, 0.8vh, 6px) clamp(8px, 1.2vw, 14px);
+    padding: clamp(3px, 0.8svh, 6px) clamp(8px, 1.2vw, 14px);
     cursor: pointer;
     transition: all 0.2s ease;
     width: auto;
@@ -1544,7 +1544,7 @@ input[type="text"]:focus {
 #presentation-panel .header-right-group,
 #presentation-details .pres-item-right-wrapper {
     display: grid;
-    grid-template-columns: clamp(50px, 8vw, 80px) calc(2 * clamp(26px, 5.5vh, 40px) + clamp(6px, 1vw, 12px));
+    grid-template-columns: clamp(50px, 8vw, 80px) calc(2 * clamp(26px, 5.5svh, 40px) + clamp(6px, 1vw, 12px));
     align-items: center;
     gap: clamp(10px, 1.8vw, 24px);
     justify-content: flex-end;
@@ -1575,11 +1575,11 @@ input[type="text"]:focus {
     background: rgba(15, 10, 28, 0.98);
     border: 2px solid rgba(140, 80, 255, 0.4);
     border-radius: 20px;
-    padding: clamp(10px, 2.5vh, 20px);
+    padding: clamp(10px, 2.5svh, 20px);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 30px rgba(142, 88, 255, 0.25);
     display: flex;
     flex-direction: column;
-    gap: clamp(8px, 2vh, 16px);
+    gap: clamp(8px, 2svh, 16px);
     animation: fadeIn 0.2s ease-out;
 }
 
@@ -1592,11 +1592,11 @@ input[type="text"]:focus {
     justify-content: space-between;
     align-items: center;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    padding-bottom: clamp(6px, 1.2vh, 10px);
+    padding-bottom: clamp(6px, 1.2svh, 10px);
 }
 
 .quick-modal-header h2 {
-    font-size: clamp(14px, 3vh, 18px);
+    font-size: clamp(14px, 3svh, 18px);
     font-weight: 800;
     margin: 0;
     color: #fff;
@@ -1614,9 +1614,9 @@ input[type="text"]:focus {
     border-radius: 8px;
     color: #000;
     font-family: var(--font-outfit);
-    font-size: clamp(14px, 3vh, 18px);
+    font-size: clamp(14px, 3svh, 18px);
     font-weight: 800;
-    padding: clamp(8px, 1.8vh, 12px) clamp(18px, 2.5vw, 28px);
+    padding: clamp(8px, 1.8svh, 12px) clamp(18px, 2.5vw, 28px);
     cursor: pointer;
     transition: all 0.2s ease;
     box-shadow: 0 0 10px rgba(57, 255, 20, 0.25);
@@ -1633,9 +1633,9 @@ input[type="text"]:focus {
     border-radius: 8px;
     color: var(--text-muted);
     font-family: var(--font-outfit);
-    font-size: clamp(14px, 3vh, 18px);
+    font-size: clamp(14px, 3svh, 18px);
     font-weight: 700;
-    padding: clamp(8px, 1.8vh, 12px) clamp(18px, 2.5vw, 28px);
+    padding: clamp(8px, 1.8svh, 12px) clamp(18px, 2.5vw, 28px);
     cursor: pointer;
     transition: all 0.2s ease;
 }
@@ -1649,7 +1649,7 @@ input[type="text"]:focus {
 /* 快速打分按鈕網格佈局 */
 .quick-score-grid {
     display: grid;
-    gap: clamp(4px, 0.8vh, 8px);
+    gap: clamp(4px, 0.8svh, 8px);
 }
 
 /* 正確性 10 欄 */
@@ -1673,9 +1673,9 @@ input[type="text"]:focus {
     border-radius: 8px;
     color: var(--text-main);
     font-family: var(--font-outfit);
-    font-size: clamp(13px, 3vh, 18px);
+    font-size: clamp(13px, 3svh, 18px);
     font-weight: 700;
-    padding: clamp(12px, 2.8vh, 22px) 0;
+    padding: clamp(12px, 2.8svh, 22px) 0;
     cursor: pointer;
     transition: all 0.1s ease;
     text-align: center;
@@ -1715,15 +1715,15 @@ input[type="text"]:focus {
 .quick-pres-section {
     display: flex;
     flex-direction: column;
-    gap: clamp(4px, 1vh, 8px);
+    gap: clamp(4px, 1svh, 8px);
     background: rgba(255, 255, 255, 0.01);
     border: 1px solid rgba(255, 255, 255, 0.04);
     border-radius: 12px;
-    padding: clamp(6px, 1.2vh, 12px);
+    padding: clamp(6px, 1.2svh, 12px);
 }
 
 .quick-pres-section-title {
-    font-size: clamp(11px, 2.5vh, 14px);
+    font-size: clamp(11px, 2.5svh, 14px);
     font-weight: 700;
     color: var(--color-info);
     border-left: 3px solid var(--color-info);
@@ -1758,9 +1758,9 @@ input[type="text"]:focus {
         padding-bottom: 4px;
     }
     .btn-quick-num {
-        padding: clamp(8px, 2vh, 12px) 0;
+        padding: clamp(8px, 2svh, 12px) 0;
         border-radius: 6px;
-        font-size: clamp(12px, 2.5vh, 14px);
+        font-size: clamp(12px, 2.5svh, 14px);
     }
     .quick-pres-section {
         padding: 4px 6px;
@@ -1787,7 +1787,7 @@ input[type="text"]:focus {
 }
 
 .inline-timer-display .timer-lbl {
-    font-size: clamp(10px, 2vh, 12px);
+    font-size: clamp(10px, 2svh, 12px);
     color: var(--text-muted);
 }
 
@@ -1809,9 +1809,9 @@ input[type="text"]:focus {
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 8px;
     color: var(--text-muted);
-    font-size: clamp(10px, 2.2vh, 13px);
+    font-size: clamp(10px, 2.2svh, 13px);
     font-weight: 700;
-    padding: clamp(4px, 0.8vh, 8px) clamp(8px, 1.2vw, 15px);
+    padding: clamp(4px, 0.8svh, 8px) clamp(8px, 1.2vw, 15px);
     cursor: pointer;
     transition: all 0.2s ease;
     user-select: none;
@@ -1901,7 +1901,7 @@ input[type="text"]:focus {
     background: var(--bg-panel);
     border: 1.5px solid var(--bg-panel-border);
     border-radius: 12px;
-    padding: clamp(5px, 1vh, 10px) clamp(10px, 1.5vw, 20px);
+    padding: clamp(5px, 1svh, 10px) clamp(10px, 1.5vw, 20px);
     flex-shrink: 0;
     gap: clamp(8px, 1vw, 16px);
 }
@@ -1936,7 +1936,7 @@ input[type="text"]:focus {
     background: var(--bg-panel);
     border: 1.5px solid var(--bg-panel-border);
     border-radius: 12px;
-    padding: clamp(6px, 1vh, 12px) clamp(10px, 1.5vw, 20px);
+    padding: clamp(6px, 1svh, 12px) clamp(10px, 1.5vw, 20px);
 }
 
 .pk-player-info {
@@ -1958,7 +1958,7 @@ input[type="text"]:focus {
 }
 
 .pk-player-side-badge {
-    font-size: clamp(11px, 2vh, 14px);
+    font-size: clamp(11px, 2svh, 14px);
     font-weight: 800;
     letter-spacing: 0.5px;
     padding: 2px 8px;
@@ -1978,13 +1978,13 @@ input[type="text"]:focus {
 }
 
 .pk-player-team {
-    font-size: clamp(14px, 3vh, 22px);
+    font-size: clamp(14px, 3svh, 22px);
     color: var(--text-muted);
     font-weight: 500;
 }
 
 .pk-player-name {
-    font-size: clamp(14px, 3vh, 22px);
+    font-size: clamp(14px, 3svh, 22px);
     color: var(--text-main);
     font-weight: 700;
 }
@@ -2004,21 +2004,21 @@ input[type="text"]:focus {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: clamp(4px, 0.8vh, 8px);
+    gap: clamp(4px, 0.8svh, 8px);
 }
 
 .pk-timer-display {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: clamp(2px, 0.5vh, 6px) clamp(12px, 2vw, 24px);
+    padding: clamp(2px, 0.5svh, 6px) clamp(12px, 2vw, 24px);
     background: rgba(0, 0, 0, 0.3);
     border-radius: 10px;
     border: 1px solid rgba(255, 204, 0, 0.2);
 }
 
 .pk-timer-display .timer-val {
-    font-size: clamp(18px, 4vh, 28px);
+    font-size: clamp(18px, 4svh, 28px);
     font-weight: 900;
     color: var(--color-warning);
     text-shadow: 0 0 12px rgba(255, 204, 0, 0.4);
@@ -2027,8 +2027,8 @@ input[type="text"]:focus {
 
 .pk-submit-btn {
     white-space: nowrap;
-    padding: clamp(6px, 1vh, 10px) clamp(16px, 2vw, 28px) !important;
-    font-size: clamp(14px, 2.8vh, 18px) !important;
+    padding: clamp(6px, 1svh, 10px) clamp(16px, 2vw, 28px) !important;
+    font-size: clamp(14px, 2.8svh, 18px) !important;
 }
 
 /* ── 主體三欄格線 ── */
@@ -2049,7 +2049,7 @@ input[type="text"]:focus {
     background: var(--bg-panel);
     border: 1.5px solid var(--bg-panel-border);
     border-radius: 16px;
-    padding: clamp(6px, 1.2vh, 12px) clamp(4px, 1vw, 10px);
+    padding: clamp(6px, 1.2svh, 12px) clamp(4px, 1vw, 10px);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     height: 100%;
     box-sizing: border-box;
@@ -2079,7 +2079,7 @@ input[type="text"]:focus {
     flex-direction: column;
     align-items: center;
     gap: 2px;
-    padding: clamp(4px, 0.8vh, 8px) clamp(8px, 1.2vw, 16px);
+    padding: clamp(4px, 0.8svh, 8px) clamp(8px, 1.2vw, 16px);
     background: rgba(0, 0, 0, 0.2);
     border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.06);
@@ -2089,12 +2089,12 @@ input[type="text"]:focus {
 }
 
 .pk-side-total .score-lbl {
-    font-size: clamp(9px, 1.8vh, 12px);
+    font-size: clamp(9px, 1.8svh, 12px);
     color: var(--text-muted);
 }
 
 .pk-side-total .score-val {
-    font-size: clamp(16px, 3.8vh, 26px);
+    font-size: clamp(16px, 3.8svh, 26px);
     font-weight: 900;
     font-variant-numeric: tabular-nums;
 }
@@ -2122,7 +2122,7 @@ input[type="text"]:focus {
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
     gap: clamp(6px, 1vw, 14px);
-    padding: clamp(6px, 1.2vh, 12px) clamp(8px, 1.2vw, 16px) !important;
+    padding: clamp(6px, 1.2svh, 12px) clamp(8px, 1.2vw, 16px) !important;
     flex-shrink: 0;
 }
 
@@ -2155,7 +2155,7 @@ input[type="text"]:focus {
 }
 
 .pk-dual-row .btn-quick-score {
-    width: calc(2 * clamp(26px, 5.5vh, 40px) + clamp(6px, 1vw, 12px));
+    width: calc(2 * clamp(26px, 5.5svh, 40px) + clamp(6px, 1vw, 12px));
     min-width: 0;
     max-width: none;
     padding-left: 0;
@@ -2171,7 +2171,7 @@ input[type="text"]:focus {
 }
 
 .pk-dual-center-label h3 {
-    font-size: clamp(11px, 2.3vh, 15px);
+    font-size: clamp(11px, 2.3svh, 15px);
     font-weight: 700;
     margin: 0;
     letter-spacing: 0.5px;
@@ -2179,7 +2179,7 @@ input[type="text"]:focus {
 }
 
 .pk-en-label {
-    font-size: clamp(11px, 2.3vh, 15px);
+    font-size: clamp(11px, 2.3svh, 15px);
     color: var(--text-muted);
     font-weight: 500;
     margin-top: 1px;
@@ -2192,9 +2192,9 @@ input[type="text"]:focus {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: clamp(4px, 0.8vh, 8px);
+    gap: clamp(4px, 0.8svh, 8px);
     min-height: 0;
-    padding: clamp(6px, 1vh, 12px) clamp(8px, 1.2vw, 16px) !important;
+    padding: clamp(6px, 1svh, 12px) clamp(8px, 1.2vw, 16px) !important;
 }
 
 /* 細項列：左青 | 中標題 | 右紅 */
@@ -2207,7 +2207,7 @@ input[type="text"]:focus {
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 10px;
-    padding: clamp(3px, 0.6vh, 8px) clamp(8px, 1.2vw, 14px);
+    padding: clamp(3px, 0.6svh, 8px) clamp(8px, 1.2vw, 14px);
     min-height: 0;
     box-sizing: border-box;
 }
@@ -2237,7 +2237,7 @@ input[type="text"]:focus {
 .pk-pres-label {
     text-align: center;
     white-space: nowrap;
-    font-size: clamp(11px, 2.2vh, 14px) !important;
+    font-size: clamp(11px, 2.2svh, 14px) !important;
 }
 
 /* 底部雙方總分比較 */
@@ -2246,7 +2246,7 @@ input[type="text"]:focus {
     grid-template-columns: 1fr auto 1fr;
     justify-items: center;
     align-items: center;
-    padding: clamp(6px, 1.2vh, 12px) !important;
+    padding: clamp(6px, 1.2svh, 12px) !important;
     flex-shrink: 0;
 }
 
@@ -2258,18 +2258,18 @@ input[type="text"]:focus {
 }
 
 .pk-total-display .score-lbl {
-    font-size: clamp(10px, 2vh, 13px);
+    font-size: clamp(10px, 2svh, 13px);
     color: var(--text-muted);
 }
 
 .pk-total-display .score-val {
-    font-size: clamp(20px, 5vh, 34px);
+    font-size: clamp(20px, 5svh, 34px);
     font-weight: 900;
     font-variant-numeric: tabular-nums;
 }
 
 .pk-vs-divider {
-    font-size: clamp(14px, 3vh, 22px);
+    font-size: clamp(14px, 3svh, 22px);
     font-weight: 900;
     color: var(--text-muted);
     letter-spacing: 2px;

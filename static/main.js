@@ -1,4 +1,11 @@
-﻿const socket = io();
+const socket = io({
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    randomizationFactor: 0.5,
+    timeout: 20000
+});
 
 // 全域事件監聽 (除錯用)
 socket.onAny((event, ...args) => {
@@ -20,8 +27,8 @@ socket.on('connect', () => {
     }
 });
 
-socket.on('disconnect', () => {
-    console.log('Socket.IO disconnected');
+socket.on('disconnect', (reason) => {
+    console.log('Socket.IO disconnected:', reason);
     const statusText = document.getElementById('connection-status-text');
     if (statusText) {
         statusText.innerHTML = '<span class="pulse-dot" style="background-color: var(--color-danger); box-shadow: 0 0 8px var(--color-danger);"></span>連線中斷，正在重新連線...';
@@ -81,6 +88,8 @@ socket.on('connected_judges_update', (data) => {
 let myJudgeId = "";
 let currentMode = 0; // 0: Cutoff, 1: PK, 2: Freestyle, 3: Quick
 let currentStage = 1;
+let currentPkSequenceMode = 0;
+let currentPlayerSide = 0;
 let hasSecondRound = false;
 let countdownInterval = null;
 let currentCountdownSec = 90;
@@ -298,6 +307,8 @@ socket.on('scoring_start', (data) => {
         currentStage = data.stage !== undefined ? data.stage : 1;
         const pkSeqMode = data.pk_sequence_mode !== undefined ? data.pk_sequence_mode : 0;
         const playerSide = data.player_side !== undefined ? data.player_side : 0;
+        currentPkSequenceMode = pkSeqMode;
+        currentPlayerSide = playerSide;
         
         // 若為 PK 同時上場模式，轉向 PK 首層雙排介面
         if (currentMode === 1 && pkSeqMode === 0) {
@@ -551,11 +562,22 @@ function applyStopScoringUI(data) {
             }
             const winEl = document.getElementById('pk-res-winner-text');
             if (winEl) {
-                if (finalChung > finalHong) {
+                const roundedChung = Number(finalChung.toFixed(3));
+                const roundedHong = Number(finalHong.toFixed(3));
+                const chungP = Number(pkScores.chung_p || 0);
+                const hongP = Number(pkScores.hong_p || 0);
+                const chungTot = Number(pkScores.chung_tot || 0);
+                const hongTot = Number(pkScores.hong_tot || 0);
+                let winner = '';
+                if (roundedChung !== roundedHong) winner = roundedChung > roundedHong ? 'chung' : 'hong';
+                else if (chungP !== hongP) winner = chungP > hongP ? 'chung' : 'hong';
+                else if (chungTot !== hongTot) winner = chungTot > hongTot ? 'chung' : 'hong';
+
+                if (winner === 'chung') {
                     winEl.innerText = "🔵 青方 獲勝 (Chung WIN)";
                     winEl.style.color = "#00ccff";
                     winEl.style.textShadow = "0 0 10px rgba(0,204,255,0.4)";
-                } else if (finalHong > finalChung) {
+                } else if (winner === 'hong') {
                     winEl.innerText = "🔴 紅方 獲勝 (Hong WIN)";
                     winEl.style.color = "#ff3366";
                     winEl.style.textShadow = "0 0 10px rgba(255,51,102,0.4)";
@@ -658,6 +680,8 @@ socket.on('reconnect_state', (data) => {
             currentStage = data.stage !== undefined ? data.stage : 1;
             const pkSeqMode = data.pk_sequence_mode !== undefined ? data.pk_sequence_mode : 0;
             const playerSide = data.current_player_side !== undefined ? data.current_player_side : 0;
+            currentPkSequenceMode = pkSeqMode;
+            currentPlayerSide = playerSide;
             const isPkSeq = (currentMode === 1 && pkSeqMode !== 0);
             
             // 1. 還原打分變數
@@ -1299,7 +1323,48 @@ function adjustFreestyleSub(id, delta) {
 // 5. 總分彙整與送出分數
 // ==========================================
 
-// 計算並更新總得分顯示
+function syncScoreDraft() {
+    if (!myJudgeId || !socket.connected) return;
+
+    if (currentMode === 1 && currentPkSequenceMode === 0) {
+        const chung = pkCalcSideScore('chung');
+        const hong = pkCalcSideScore('hong');
+        socket.emit('score_draft', {
+            chung: { accuracy: chung.acc, presentation: chung.pres, p1: chung.p1, p2: chung.p2, p3: chung.p3 },
+            hong: { accuracy: hong.acc, presentation: hong.pres, p1: hong.p1, p2: hong.p2, p3: hong.p3 }
+        });
+        return;
+    }
+
+    if (currentMode === 2) {
+        let techSum = 0;
+        let presSum = 0;
+        freestyleTechKeys.forEach(k => techSum += freestyleScores[k.id] || 0);
+        freestylePresKeys.forEach(k => presSum += freestyleScores[k.id] || 0);
+        socket.emit('score_draft', {
+            accuracy: parseFloat(techSum.toFixed(1)),
+            presentation: parseFloat(presSum.toFixed(1)),
+            p1: freestyleScores.t1 || 0,
+            p2: freestyleScores.t2 || 0,
+            p3: freestyleScores.t3 || 0,
+            freestyle_scores: { ...freestyleScores }
+        });
+        return;
+    }
+
+    let acc = 4.0 - (cntMinor * 0.1) - (cntMajor * 0.3);
+    if (acc < 0.0) acc = 0.0;
+    const pres = poomsaeSubScores.p1 + poomsaeSubScores.p2 + poomsaeSubScores.p3;
+    socket.emit('score_draft', {
+        accuracy: parseFloat(acc.toFixed(1)),
+        presentation: parseFloat(pres.toFixed(1)),
+        p1: poomsaeSubScores.p1,
+        p2: poomsaeSubScores.p2,
+        p3: poomsaeSubScores.p3
+    });
+}
+
+// 計算並更新總得分顯示，同步保存尚未送出的草稿
 function updateTotals() {
     if (currentMode === 2) {
         // 自由品勢計算
@@ -1327,6 +1392,7 @@ function updateTotals() {
         document.getElementById('val-pres').innerText = pres.toFixed(1);
         document.getElementById('val-total').innerText = total.toFixed(1);
     }
+    syncScoreDraft();
 }
 
 // 送出評分結果
@@ -1371,7 +1437,8 @@ function submitScore() {
         presentation: pres,
         p1: p1,
         p2: p2,
-        p3: p3
+        p3: p3,
+        freestyle_scores: currentMode === 2 ? { ...freestyleScores } : {}
     });
     
     // 停止倒數計時器
@@ -1969,6 +2036,7 @@ function pkUpdateTotals() {
         document.getElementById(`pk-${side}-total`).innerText = total.toFixed(1);
         document.getElementById(`pk-${side}-bottom-total`).innerText = total.toFixed(1);
     });
+    syncScoreDraft();
 }
 
 // ── 扣分 ──
@@ -2060,6 +2128,11 @@ function pkModifyScore() {
 
 // ── 進入 PK 同時上場評分畫面 ──
 function showPkScoringScreen(data) {
+    currentMode = 1;
+    currentStage = data.stage !== undefined ? data.stage : 1;
+    currentPkSequenceMode = data.pk_sequence_mode !== undefined ? data.pk_sequence_mode : 0;
+    currentPlayerSide = data.player_side !== undefined ? data.player_side : 0;
+
     // 填入頂部資訊
     document.getElementById('pk-info-type').innerText = data.match_type || '---';
     document.getElementById('pk-info-category').innerText = data.category || '---';

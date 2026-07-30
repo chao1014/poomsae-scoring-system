@@ -1455,13 +1455,13 @@ class PoomsaeReplicaGUI:
                     "presentation_score": mdata.get("presentation_score", 0.0),
                     "raw_total_score": mdata.get("raw_total_score", 0.0)
                 })
-        # 依據 WT 規則排序：最終得分降序 -> 表現力去尾平均降序 -> 原始分數加總總分降序
-        leaderboard.sort(key=lambda x: (x["score"], x["presentation_score"], x["raw_total_score"]), reverse=True)
+        # 依據規則排序：最終得分(Avg) -> 技術分(P) -> 原始總加總分(Tot)
+        leaderboard.sort(key=lambda x: (round(x["score"], 3), round(x["presentation_score"], 3), x["raw_total_score"]), reverse=True)
         
         # 計算並列名次：只有三項分數皆相同時才算並列
-        # 使用 round(x, 4) 避免浮點數精度差異導致應並列卻不並列
+        # 使用畫面顯示的三位小數判定同分，避免隱藏小數先決定名次
         def scores_eq(a, b):
-            return round(a, 4) == round(b, 4)
+            return round(a, 3) == round(b, 3)
         
         for idx, item in enumerate(leaderboard):
             if idx > 0 and (
