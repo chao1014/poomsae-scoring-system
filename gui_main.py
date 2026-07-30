@@ -131,13 +131,13 @@ class PoomsaeReplicaGUI:
                     "raw_total_score": mdata.get("raw_total_score", 0.0)
                 })
                 
-        # 依據 WT 規則排序：最終得分降序 -> 表現力去尾平均降序 -> 原始分數加總總分降序
-        leaderboard.sort(key=lambda x: (x["score"], x["presentation_score"], x["raw_total_score"]), reverse=True)
+        # 依據規則排序：最終得分(Avg) -> 技術分(P) -> 原始總加總分(Tot)
+        leaderboard.sort(key=lambda x: (round(x["score"], 3), round(x["presentation_score"], 3), x["raw_total_score"]), reverse=True)
         
         # 計算名次，只有當三個關鍵分數皆相同時才算並列
-        # 使用 round(x, 4) 避免浮點數精度差異（10.00000000001 != 10.0）導致應並列卻不並列
+        # 使用畫面顯示的三位小數判定同分，避免隱藏小數先決定名次
         def scores_eq(a, b):
-            return round(a, 4) == round(b, 4)
+            return round(a, 3) == round(b, 3)
         
         for idx, item in enumerate(leaderboard):
             if idx > 0 and (
@@ -1556,10 +1556,10 @@ class PoomsaeReplicaGUI:
 
     def update_left_panel_scores(self, avg_acc, avg_pres, deduction, final_avg_score, raw_sum):
         col_idx = 0 if self.current_stage == 1 else 1
-        self.left_labels[0][col_idx].config(text=f"{avg_acc:.2f}")
-        self.left_labels[1][col_idx].config(text=f"{avg_pres:.2f}")
+        self.left_labels[0][col_idx].config(text=f"{avg_acc:.3f}")
+        self.left_labels[1][col_idx].config(text=f"{avg_pres:.3f}")
         self.left_labels[2][col_idx].config(text=f"{deduction:.1f}")
-        self.left_labels[3][col_idx].config(text=f"{(avg_acc + avg_pres - deduction):.2f}")
+        self.left_labels[3][col_idx].config(text=f"{(avg_acc + avg_pres - deduction):.3f}")
         if self.current_stage == 1:
             self.score_1r_avg = final_avg_score
             self.score_1r_raw = raw_sum
@@ -1649,10 +1649,10 @@ class PoomsaeReplicaGUI:
     def update_right_panel_scores(self, avg_acc, avg_pres, deduction, final_avg_score, raw_sum):
         col_idx = 0 if self.current_stage == 1 else 1
         if hasattr(self, 'right_labels') and self.right_labels:
-            self.right_labels[0][col_idx].config(text=f"{avg_acc:.2f}")
-            self.right_labels[1][col_idx].config(text=f"{avg_pres:.2f}")
+            self.right_labels[0][col_idx].config(text=f"{avg_acc:.3f}")
+            self.right_labels[1][col_idx].config(text=f"{avg_pres:.3f}")
             self.right_labels[2][col_idx].config(text=f"{deduction:.1f}")
-            self.right_labels[3][col_idx].config(text=f"{(avg_acc + avg_pres - deduction):.2f}")
+            self.right_labels[3][col_idx].config(text=f"{(avg_acc + avg_pres - deduction):.3f}")
             if self.current_stage == 1:
                 self.score_1r_avg_R = final_avg_score
                 self.score_1r_raw_R = raw_sum
@@ -3087,14 +3087,15 @@ class PoomsaeReplicaGUI:
                 
                 def calc_trimmed_avg(val_list):
                     if not val_list: return 0.0
-                    if len(val_list) <= 3: return sum(val_list) / len(val_list)
-                    val_list.sort()
-                    valid = val_list[1:-1]
+                    normalized = [round(float(value), 1) for value in val_list]
+                    if len(normalized) <= 3: return sum(normalized) / len(normalized)
+                    normalized.sort()
+                    valid = normalized[1:-1]
                     return sum(valid) / len(valid)
                 
                 avg_acc = calc_trimmed_avg(accs)
                 avg_pres = calc_trimmed_avg(pres)
-                total_raw = sum(accs) + sum(pres)
+                total_raw = sum(round(float(value), 1) for value in accs + pres)
                 return avg_acc, avg_pres, total_raw
 
             html_block = f"""<tr>
@@ -3250,10 +3251,10 @@ class PoomsaeReplicaGUI:
                 rank_or_winner = ""
                 if is_pk:
                     def val_eq(a, b):
-                        return round(a, 4) == round(b, 4)
-                    if total_avg > total_avg_h:
+                        return round(a, 3) == round(b, 3)
+                    if round(total_avg, 3) > round(total_avg_h, 3):
                         rank_or_winner = "BLUE"
-                    elif total_avg_h > total_avg:
+                    elif round(total_avg_h, 3) > round(total_avg, 3):
                         rank_or_winner = "RED"
                     else:
                         if val_eq(avg_pres_chung, avg_pres_hong):
@@ -3699,13 +3700,15 @@ class PoomsaeReplicaGUI:
                 
                 def calc_trimmed_avg(val_list):
                     if not val_list: return 0.0
-                    if len(val_list) <= 3: return sum(val_list) / len(val_list)
-                    val_list.sort()
-                    return sum(val_list[1:-1]) / len(val_list[1:-1])
+                    normalized = [round(float(value), 1) for value in val_list]
+                    if len(normalized) <= 3: return sum(normalized) / len(normalized)
+                    normalized.sort()
+                    valid = normalized[1:-1]
+                    return sum(valid) / len(valid)
                 
                 avg_acc = calc_trimmed_avg(accs)
                 avg_pres = calc_trimmed_avg(pres)
-                total_raw = sum(accs) + sum(pres)
+                total_raw = sum(round(float(value), 1) for value in accs + pres)
                 return avg_acc, avg_pres, total_raw
 
             end_time_str = ""
@@ -3872,11 +3875,11 @@ class PoomsaeReplicaGUI:
             pk_winner = ""
             if is_pk and not is_withdraw:
                 def val_eq(a, b):
-                    return round(a, 4) == round(b, 4)
-                t_avg_chung = total_avg
-                t_avg_hong = total_avg_h
-                pres_chung = avg_pres_chung
-                pres_hong = avg_pres_hong
+                    return round(a, 3) == round(b, 3)
+                t_avg_chung = round(total_avg, 3)
+                t_avg_hong = round(total_avg_h, 3)
+                pres_chung = round(avg_pres_chung, 3)
+                pres_hong = round(avg_pres_hong, 3)
                 raw_chung = total_raw
                 raw_hong = total_raw_h
                 
@@ -3931,7 +3934,7 @@ class PoomsaeReplicaGUI:
                     no_val = 999999
                 if item["has_score"]:
                     # 有成績：以負值讓 sort 以降序排列三個決勝欄位
-                    return (0, -item["score"], -item["presentation_score"], -item["raw_total_score"], no_val)
+                    return (0, -round(item["score"], 3), -round(item["presentation_score"], 3), -item["raw_total_score"], no_val)
                 else:
                     # 無成績：排在最後，再按籤號升序
                     return (1, 0, 0, 0, no_val)
@@ -3940,7 +3943,7 @@ class PoomsaeReplicaGUI:
         # 計算非 PK 賽制的排名並填入 __RANK_OR_WINNER__
         if not has_pk:
             def scores_eq(a, b):
-                return round(a, 4) == round(b, 4)
+                return round(a, 3) == round(b, 3)
             has_score_items = [item for item in detailed_list if item["has_score"]]
             for idx, item in enumerate(has_score_items):
                 if idx > 0 and (
@@ -4227,7 +4230,7 @@ class PoomsaeReplicaGUI:
             self.root.after(0, lambda: self.lbl_final_L.config(text=score))
 
     def get_tiebreaker_metrics(self, uid, mdata, player_side=None):
-        """計算選手的同分打破指標：(最終得分, 表現力去尾平均, 所有裁判原始分數的加總總分)"""
+        """計算選手的同分指標：(最終得分 Avg, 技術分 P, 原始總加總分 Tot)"""
         if player_side is None:
             player_side = 0
             
@@ -4282,7 +4285,7 @@ class PoomsaeReplicaGUI:
                 ded = row[4] if len(row) > 4 else 0.0
                 total = row[5] if len(row) > 5 else (acc + pres)
                 
-                raw_sum_total += total
+                raw_sum_total += round(float(total), 1)
                 
                 if r_num not in r_scores:
                     r_scores[r_num] = {"acc": [], "pres": [], "ded": []}
@@ -4292,11 +4295,11 @@ class PoomsaeReplicaGUI:
                 
             def calc_avg(scores):
                 if not scores: return 0.0
-                if len(scores) <= 3: return sum(scores) / len(scores)
-                else:
-                    scores_sorted = sorted(scores)
-                    valid = scores_sorted[1:-1]
-                    return sum(valid) / len(valid)
+                normalized = [round(float(score), 1) for score in scores]
+                if len(normalized) <= 3: return sum(normalized) / len(normalized)
+                scores_sorted = sorted(normalized)
+                valid = scores_sorted[1:-1]
+                return sum(valid) / len(valid)
                     
             r_averages = []
             r_pres_averages = []

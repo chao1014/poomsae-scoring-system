@@ -1205,19 +1205,20 @@ class PKProjectionWindow(tk.Toplevel):
                             
                 def get_trimmed_avg(val_list):
                     if not val_list: return 0.0
-                    if len(val_list) <= 3: return sum(val_list) / len(val_list)
-                    val_list.sort()
-                    return sum(val_list[1:-1]) / len(val_list[1:-1])
+                    normalized = [round(float(value), 1) for value in val_list]
+                    if len(normalized) <= 3: return sum(normalized) / len(normalized)
+                    normalized.sort()
+                    return sum(normalized[1:-1]) / len(normalized[1:-1])
                     
                 if chung_accs or hong_accs:
                     chung_avg_acc = get_trimmed_avg(chung_accs)
                     chung_avg_pres = get_trimmed_avg(chung_press)
-                    chung_raw_total = sum(chung_totals)
+                    chung_raw_total = sum(round(float(score), 1) for score in chung_totals)
                     chung_deduction = max(chung_deds) if chung_deds else 0.0
                     
                     hong_avg_acc = get_trimmed_avg(hong_accs)
                     hong_avg_pres = get_trimmed_avg(hong_press)
-                    hong_raw_total = sum(hong_totals)
+                    hong_raw_total = sum(round(float(score), 1) for score in hong_totals)
                     hong_deduction = max(hong_deds) if hong_deds else 0.0
                 else:
                     # Fallback: 使用當前記憶體中的即時分數
@@ -1234,11 +1235,11 @@ class PKProjectionWindow(tk.Toplevel):
                             
                     chung_avg_acc = get_trimmed_avg(chung_accs)
                     chung_avg_pres = get_trimmed_avg(chung_press)
-                    chung_raw_total = sum(chung_totals)
+                    chung_raw_total = sum(round(float(score), 1) for score in chung_totals)
                     
                     hong_avg_acc = get_trimmed_avg(hong_accs)
                     hong_avg_pres = get_trimmed_avg(hong_press)
-                    hong_raw_total = sum(hong_totals)
+                    hong_raw_total = sum(round(float(score), 1) for score in hong_totals)
                     
                     chung_deduction = 0.0
                     if gui and hasattr(gui, 'lbl_deduction_val'):
@@ -1424,12 +1425,11 @@ class PKProjectionWindow(tk.Toplevel):
                     
                 def calc_avg(scores):
                     if not scores: return 0.0
-                    if len(scores) <= 3: return sum(scores) / len(scores)
-                    else:
-                        scores_only = list(scores)
-                        scores_only.sort()
-                        valid = scores_only[1:-1]
-                        return sum(valid) / len(valid)
+                    scores_only = [round(float(score), 1) for score in scores]
+                    if len(scores_only) <= 3: return sum(scores_only) / len(scores_only)
+                    scores_only.sort()
+                    valid = scores_only[1:-1]
+                    return sum(valid) / len(valid)
                         
                 def calc_group_metrics(grp_data):
                     if not grp_data: return {'acc': 0.0, 'pres': 0.0, 'ded': 0.0, 'total': 0.0, 'raw_sum': 0.0}
@@ -1443,7 +1443,7 @@ class PKProjectionWindow(tk.Toplevel):
                     deduction = max(deds) if deds else 0.0
                     
                     final = avg_acc + avg_pres - deduction
-                    raw_sum = sum(totals)
+                    raw_sum = sum(round(float(score), 1) for score in totals)
                     
                     return {
                         'acc': avg_acc,
@@ -1558,21 +1558,21 @@ class PKProjectionWindow(tk.Toplevel):
                 win_text = "DRAW"
                 win_color = "#ffffff"
                 win_bg = "#444444"
-                if chung_final > hong_final:
+                if round(chung_final, 3) > round(hong_final, 3):
                     win_text = "WINNER\nBLUE"
                     win_color = "#00ccff"
                     win_bg = "#001a33"
-                elif hong_final > chung_final:
+                elif round(hong_final, 3) > round(chung_final, 3):
                     win_text = "WINNER\nRED"
                     win_color = "#ff3366"
                     win_bg = "#330011"
                 else:
-                    # 第二決勝：表現力去尾平均分
-                    if chung_pres > hong_pres:
+                    # 第二決勝：技術分（P）
+                    if round(chung_pres, 3) > round(hong_pres, 3):
                         win_text = "WINNER\nBLUE"
                         win_color = "#00ccff"
                         win_bg = "#001a33"
-                    elif hong_pres > chung_pres:
+                    elif round(hong_pres, 3) > round(chung_pres, 3):
                         win_text = "WINNER\nRED"
                         win_color = "#ff3366"
                         win_bg = "#330011"
