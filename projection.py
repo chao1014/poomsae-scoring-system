@@ -2,6 +2,7 @@ import tkinter as tk
 import os
 import socket
 import config
+from scoring import excluded_extreme_ids, format_score
 
 system_settings = config.system_settings
 current_state = config.current_state
@@ -20,13 +21,7 @@ def log_refresh_errors(func):
     return wrapper
 
 def format_pk_score(val):
-    try:
-        val_f = float(val)
-        if abs(val_f - 10.0) < 0.0001:
-            return "10.00"
-        return f"{val_f:.3f}"
-    except Exception:
-        return str(val)
+    return format_score(val)
 
 class ProjectionWindow(tk.Toplevel):
     def __init__(self, master, x=0, y=0, width=1920, height=1080):
@@ -842,6 +837,7 @@ class ProjectionWindow(tk.Toplevel):
                 row_gray_indices = {}
                 for r in range(1, num_rows):
                     key = row_keys[r]
+                    trim_key = "pres" if key in ("p1", "p2", "p3") else key
                     valid_scores = []
                     for c in range(1, 8):
                         judge_num = c
@@ -865,27 +861,10 @@ class ProjectionWindow(tk.Toplevel):
                                     break
                                 
                         if is_active and jd_found and jd_found.get('submitted', False):
-                            val = float(jd_found.get(key, 0.0))
+                            val = float(jd_found.get(trim_key, 0.0))
                             valid_scores.append((c, val))
                             
-                    gray_set = set()
-                    if len(valid_scores) > 3:
-                        scores_only = [item[1] for item in valid_scores]
-                        min_val = min(scores_only)
-                        max_val = max(scores_only)
-                        
-                        min_col = -1
-                        max_col = -1
-                        for c, val in valid_scores:
-                            if val == min_val and min_col == -1:
-                                min_col = c
-                        for c, val in valid_scores:
-                            if val == max_val and max_col == -1 and c != min_col:
-                                max_col = c
-                        if min_col != -1: gray_set.add(min_col)
-                        if max_col != -1: gray_set.add(max_col)
-                        
-                    row_gray_indices[r] = gray_set
+                    row_gray_indices[r] = excluded_extreme_ids(dict(valid_scores))
                     
                 for r in range(num_rows):
                     for c in range(judge_count + 1):
@@ -964,7 +943,7 @@ class ProjectionWindow(tk.Toplevel):
                 final_val = gui.left_labels[3][col_idx].cget("text") if hasattr(gui, 'left_labels') else "0.00"
                 raw_sum_val = f"{gui.score_1r_raw:.1f}" if gui.current_stage == 1 else f"{gui.score_2r_raw:.1f}"
                 
-                # 將單輪結果中的 Accuracy、Presentation、Final 格式化為三位小數（滿分10分時顯示兩位）
+                # 將單輪結果中的 Accuracy、Presentation、Final 統一格式化為三位小數
                 try: acc_val_3f = format_pk_score(acc_val)
                 except: acc_val_3f = acc_val
                 try: pres_val_3f = format_pk_score(pres_val)

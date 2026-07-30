@@ -1,6 +1,7 @@
 import tkinter as tk
 import os
 import config
+from scoring import excluded_extreme_ids, format_score, trimmed_average
 
 system_settings = config.system_settings
 current_state = config.current_state
@@ -19,13 +20,7 @@ def log_refresh_errors(func):
     return wrapper
 
 def format_pk_score(val):
-    try:
-        val_f = float(val)
-        if abs(val_f - 10.0) < 0.0001:
-            return "10.00"
-        return f"{val_f:.3f}"
-    except Exception:
-        return str(val)
+    return format_score(val)
 
 class PKProjectionWindow(tk.Toplevel):
     def __init__(self, master, x=0, y=0, width=1920, height=1080):
@@ -1007,30 +1002,11 @@ class PKProjectionWindow(tk.Toplevel):
                         elif side == 1:
                             hong_by_judge[j_num] = score_dict
                 
-                def get_gray_indices(scores_dict):
-                    gray_set = set()
-                    valid_scores = [(j_num, val) for j_num, val in scores_dict.items()]
-                    if len(valid_scores) > 3:
-                        scores_only = [item[1] for item in valid_scores]
-                        min_val = min(scores_only)
-                        max_val = max(scores_only)
-                        
-                        min_judge = -1
-                        max_judge = -1
-                        for j_num, val in valid_scores:
-                            if val == min_val and min_judge == -1:
-                                min_judge = j_num
-                        for j_num, val in valid_scores:
-                            if val == max_val and max_judge == -1 and j_num != min_judge:
-                                max_judge = j_num
-                        if min_judge != -1: gray_set.add(min_judge)
-                        if max_judge != -1: gray_set.add(max_judge)
-                    return gray_set
-                    
                 row_gray_chung = {}
                 row_gray_hong = {}
                 for r in range(1, num_rows):
                     key = row_keys[r]
+                    trim_key = "pres" if key in ("p1", "p2", "p3") else key
                     chung_row_scores = {}
                     hong_row_scores = {}
                     for j_num in range(1, judge_count + 1):
@@ -1045,12 +1021,12 @@ class PKProjectionWindow(tk.Toplevel):
                             _, h_scores = self.get_judge_scores(j_num)
                             
                         if c_scores['submitted']:
-                            chung_row_scores[j_num] = c_scores[key]
+                            chung_row_scores[j_num] = c_scores[trim_key]
                         if h_scores['submitted']:
-                            hong_row_scores[j_num] = h_scores[key]
+                            hong_row_scores[j_num] = h_scores[trim_key]
                             
-                    row_gray_chung[r] = get_gray_indices(chung_row_scores)
-                    row_gray_hong[r] = get_gray_indices(hong_row_scores)
+                    row_gray_chung[r] = excluded_extreme_ids(chung_row_scores)
+                    row_gray_hong[r] = excluded_extreme_ids(hong_row_scores)
                     
                 W = self.width
                 H = self.height
@@ -1203,21 +1179,14 @@ class PKProjectionWindow(tk.Toplevel):
                             hong_totals.append(acc + pres)
                             hong_deds.append(ded)
                             
-                def get_trimmed_avg(val_list):
-                    if not val_list: return 0.0
-                    normalized = [round(float(value), 1) for value in val_list]
-                    if len(normalized) <= 3: return sum(normalized) / len(normalized)
-                    normalized.sort()
-                    return sum(normalized[1:-1]) / len(normalized[1:-1])
-                    
                 if chung_accs or hong_accs:
-                    chung_avg_acc = get_trimmed_avg(chung_accs)
-                    chung_avg_pres = get_trimmed_avg(chung_press)
+                    chung_avg_acc = trimmed_average(chung_accs)
+                    chung_avg_pres = trimmed_average(chung_press)
                     chung_raw_total = sum(round(float(score), 1) for score in chung_totals)
                     chung_deduction = max(chung_deds) if chung_deds else 0.0
                     
-                    hong_avg_acc = get_trimmed_avg(hong_accs)
-                    hong_avg_pres = get_trimmed_avg(hong_press)
+                    hong_avg_acc = trimmed_average(hong_accs)
+                    hong_avg_pres = trimmed_average(hong_press)
                     hong_raw_total = sum(round(float(score), 1) for score in hong_totals)
                     hong_deduction = max(hong_deds) if hong_deds else 0.0
                 else:
@@ -1233,12 +1202,12 @@ class PKProjectionWindow(tk.Toplevel):
                             hong_press.append(h_scores['pres'])
                             hong_totals.append(h_scores['acc'] + h_scores['pres'])
                             
-                    chung_avg_acc = get_trimmed_avg(chung_accs)
-                    chung_avg_pres = get_trimmed_avg(chung_press)
+                    chung_avg_acc = trimmed_average(chung_accs)
+                    chung_avg_pres = trimmed_average(chung_press)
                     chung_raw_total = sum(round(float(score), 1) for score in chung_totals)
                     
-                    hong_avg_acc = get_trimmed_avg(hong_accs)
-                    hong_avg_pres = get_trimmed_avg(hong_press)
+                    hong_avg_acc = trimmed_average(hong_accs)
+                    hong_avg_pres = trimmed_average(hong_press)
                     hong_raw_total = sum(round(float(score), 1) for score in hong_totals)
                     
                     chung_deduction = 0.0
@@ -1423,14 +1392,6 @@ class PKProjectionWindow(tk.Toplevel):
                     scores_by_grp[grp_key]['total'].append(tot)
                     scores_by_grp[grp_key]['ded'].append(ded)
                     
-                def calc_avg(scores):
-                    if not scores: return 0.0
-                    scores_only = [round(float(score), 1) for score in scores]
-                    if len(scores_only) <= 3: return sum(scores_only) / len(scores_only)
-                    scores_only.sort()
-                    valid = scores_only[1:-1]
-                    return sum(valid) / len(valid)
-                        
                 def calc_group_metrics(grp_data):
                     if not grp_data: return {'acc': 0.0, 'pres': 0.0, 'ded': 0.0, 'total': 0.0, 'raw_sum': 0.0}
                     accs = grp_data['acc']
@@ -1438,8 +1399,8 @@ class PKProjectionWindow(tk.Toplevel):
                     totals = grp_data['total']
                     deds = grp_data['ded']
                     
-                    avg_acc = calc_avg(accs)
-                    avg_pres = calc_avg(press)
+                    avg_acc = trimmed_average(accs)
+                    avg_pres = trimmed_average(press)
                     deduction = max(deds) if deds else 0.0
                     
                     final = avg_acc + avg_pres - deduction

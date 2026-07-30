@@ -18,6 +18,7 @@ import config
 import database
 from projection import ProjectionWindow
 import gui_dialogs
+from scoring import trimmed_average
 
 try:
     from screeninfo import get_monitors
@@ -2963,15 +2964,15 @@ class PoomsaeReplicaGUI:
         # 重新開始評分（裁判平板會看到紅方評分介面）
         self.start_scoring()
         self.update_button_states()
-    def write_html_log(self):
+    def write_html_log(self, match_uuid=None, match_data=None):
         try:
-            if not self.current_match_uuid or not self.current_match_data:
+            match_uuid = match_uuid or self.current_match_uuid
+            data = dict(match_data) if match_data is not None else self.current_match_data
+            if not match_uuid or not data:
                 return
                 
             from datetime import datetime
             import sqlite3
-            data = self.current_match_data
-            match_uuid = self.current_match_uuid
             
             # 1. 取得時間
             now = datetime.now()
@@ -3064,6 +3065,14 @@ class PoomsaeReplicaGUI:
                 if len(r) > 10: return r[10]
                 elif len(r) > 5: return r[5]
                 return 0
+
+            def get_round_deduction(side_rows, round_num):
+                round_scores = [row for row in side_rows if row[0] == round_num]
+                if round_scores and len(round_scores[0]) > 8:
+                    deductions = [row[8] for row in round_scores if row[8] is not None]
+                    if deductions:
+                        return float(deductions[0])
+                return 0.0
                 
             has_chung_scores = any(get_player_side(r) == 0 for r in rows)
             has_hong_scores = any(get_player_side(r) == 1 for r in rows)
@@ -3085,16 +3094,8 @@ class PoomsaeReplicaGUI:
                 accs = [s[2] for s in scores_list]
                 pres = [s[3] for s in scores_list]
                 
-                def calc_trimmed_avg(val_list):
-                    if not val_list: return 0.0
-                    normalized = [round(float(value), 1) for value in val_list]
-                    if len(normalized) <= 3: return sum(normalized) / len(normalized)
-                    normalized.sort()
-                    valid = normalized[1:-1]
-                    return sum(valid) / len(valid)
-                
-                avg_acc = calc_trimmed_avg(accs)
-                avg_pres = calc_trimmed_avg(pres)
+                avg_acc = trimmed_average(accs)
+                avg_pres = trimmed_average(pres)
                 total_raw = sum(round(float(value), 1) for value in accs + pres)
                 return avg_acc, avg_pres, total_raw
 
@@ -3129,13 +3130,13 @@ class PoomsaeReplicaGUI:
                 r1_avg_acc, r1_avg_pres, r1_total_raw = calc_avg(r1_scores_chung)
                 r2_avg_acc, r2_avg_pres, r2_total_raw = calc_avg(r2_scores_chung)
                 
-                try:
-                    deduction = float(self.lbl_deduction_val.cget("text"))
-                except:
-                    deduction = 0.0
-                
-                r1_avg = r1_avg_acc + r1_avg_pres - deduction if r1_scores_chung else 0.0
-                r2_avg = r2_avg_acc + r2_avg_pres - deduction if r2_scores_chung else 0.0
+                ded_1r_chung = get_round_deduction(chung_side_rows, 1)
+                ded_2r_chung = get_round_deduction(chung_side_rows, 2)
+                chung_deductions = ([ded_1r_chung] if r1_scores_chung else []) + ([ded_2r_chung] if r2_scores_chung else [])
+                total_ded_chung = sum(chung_deductions) / len(chung_deductions) if chung_deductions else 0.0
+
+                r1_avg = r1_avg_acc + r1_avg_pres - ded_1r_chung if r1_scores_chung else 0.0
+                r2_avg = r2_avg_acc + r2_avg_pres - ded_2r_chung if r2_scores_chung else 0.0
                 
                 if r1_scores_chung and r2_scores_chung:
                     total_avg = (r1_avg + r2_avg) / 2
@@ -3153,9 +3154,9 @@ class PoomsaeReplicaGUI:
                     avg_acc_chung = 0.0
                     avg_pres_chung = 0.0
                     
-                r1_text = f"{r1_avg_acc:.3f} / {r1_avg_pres:.3f} / {deduction:.1f} / {r1_avg:.3f} / {r1_total_raw:.1f}" if r1_scores_chung else ""
-                r2_text = f"{r2_avg_acc:.3f} / {r2_avg_pres:.3f} / {deduction:.1f} / {r2_avg:.3f} / {r2_total_raw:.1f}" if r2_scores_chung else ""
-                total_text = f"{avg_acc_chung:.3f} / {avg_pres_chung:.3f} / {deduction:.1f} / {total_avg:.3f} / {total_raw:.1f}" if r1_scores_chung else ""
+                r1_text = f"{r1_avg_acc:.3f} / {r1_avg_pres:.3f} / {ded_1r_chung:.1f} / {r1_avg:.3f} / {r1_total_raw:.1f}" if r1_scores_chung else ""
+                r2_text = f"{r2_avg_acc:.3f} / {r2_avg_pres:.3f} / {ded_2r_chung:.1f} / {r2_avg:.3f} / {r2_total_raw:.1f}" if r2_scores_chung else ""
+                total_text = f"{avg_acc_chung:.3f} / {avg_pres_chung:.3f} / {total_ded_chung:.1f} / {total_avg:.3f} / {total_raw:.1f}" if r1_scores_chung else ""
                 
                 # 初始化紅方欄位
                 r1_text_hong = ""
@@ -3172,13 +3173,13 @@ class PoomsaeReplicaGUI:
                     r1_avg_acc_h, r1_avg_pres_h, r1_total_raw_h = calc_avg(r1_scores_hong)
                     r2_avg_acc_h, r2_avg_pres_h, r2_total_raw_h = calc_avg(r2_scores_hong)
                     
-                    try:
-                        deduction_R = float(self.lbl_deduction_val_R.cget("text")) if hasattr(self, 'lbl_deduction_val_R') else 0.0
-                    except:
-                        deduction_R = 0.0
-                        
-                    r1_avg_h = r1_avg_acc_h + r1_avg_pres_h - deduction_R if r1_scores_hong else 0.0
-                    r2_avg_h = r2_avg_acc_h + r2_avg_pres_h - deduction_R if r2_scores_hong else 0.0
+                    ded_1r_hong = get_round_deduction(hong_side_rows, 1)
+                    ded_2r_hong = get_round_deduction(hong_side_rows, 2)
+                    hong_deductions = ([ded_1r_hong] if r1_scores_hong else []) + ([ded_2r_hong] if r2_scores_hong else [])
+                    total_ded_hong = sum(hong_deductions) / len(hong_deductions) if hong_deductions else 0.0
+
+                    r1_avg_h = r1_avg_acc_h + r1_avg_pres_h - ded_1r_hong if r1_scores_hong else 0.0
+                    r2_avg_h = r2_avg_acc_h + r2_avg_pres_h - ded_2r_hong if r2_scores_hong else 0.0
                     
                     if r1_scores_hong and r2_scores_hong:
                         total_avg_h = (r1_avg_h + r2_avg_h) / 2
@@ -3196,9 +3197,9 @@ class PoomsaeReplicaGUI:
                         avg_acc_hong = 0.0
                         avg_pres_hong = 0.0
                         
-                    r1_text_hong = f"{r1_avg_acc_h:.3f} / {r1_avg_pres_h:.3f} / {deduction_R:.1f} / {r1_avg_h:.3f} / {r1_total_raw_h:.1f}" if r1_scores_hong else ""
-                    r2_text_hong = f"{r2_avg_acc_h:.3f} / {r2_avg_pres_h:.3f} / {deduction_R:.1f} / {r2_avg_h:.3f} / {r2_total_raw_h:.1f}" if r2_scores_hong else ""
-                    total_text_hong = f"{avg_acc_hong:.3f} / {avg_pres_hong:.3f} / {deduction_R:.1f} / {total_avg_h:.3f} / {total_raw_h:.1f}" if r1_scores_hong else ""
+                    r1_text_hong = f"{r1_avg_acc_h:.3f} / {r1_avg_pres_h:.3f} / {ded_1r_hong:.1f} / {r1_avg_h:.3f} / {r1_total_raw_h:.1f}" if r1_scores_hong else ""
+                    r2_text_hong = f"{r2_avg_acc_h:.3f} / {r2_avg_pres_h:.3f} / {ded_2r_hong:.1f} / {r2_avg_h:.3f} / {r2_total_raw_h:.1f}" if r2_scores_hong else ""
+                    total_text_hong = f"{avg_acc_hong:.3f} / {avg_pres_hong:.3f} / {total_ded_hong:.1f} / {total_avg_h:.3f} / {total_raw_h:.1f}" if r1_scores_hong else ""
                     print(f"[HTML Log Debug] hong_rows={len(hong_side_rows)}, total_text_hong={total_text_hong}")
                 
                 # 輸出成績資料行 (PK時同時印出青紅雙方成績)
@@ -3337,7 +3338,7 @@ class PoomsaeReplicaGUI:
         # 將寫日誌與匯出報表移至背景執行緒執行，避免阻塞 GUI
         def run_background_logs():
             try:
-                self.write_html_log()
+                self.write_html_log(match_uuid=log_match_uuid, match_data=log_match_data)
             except Exception as log_err:
                 import traceback
                 print(f"Error writing HTML log in background: {log_err}")
@@ -3346,7 +3347,7 @@ class PoomsaeReplicaGUI:
                     traceback.print_exc(file=f)
                 
             try:
-                self.export_match_log(auto_open=False)
+                self.export_match_log(auto_open=False, target_session=log_target_session)
             except Exception as match_log_err:
                 import traceback
                 print(f"Error exporting match log in background: {match_log_err}")
@@ -3359,6 +3360,13 @@ class PoomsaeReplicaGUI:
             # 完賽後立即清除該選手的排行榜分數快取，強制下次查詢排行榜時重新從資料庫取得正確分數
             self.invalidate_leaderboard_cache(uid=self.current_match_uuid)
             self.update_tree_columns()
+
+        log_match_uuid = self.current_match_uuid
+        log_match_data = dict(self.current_match_data) if self.current_match_data else None
+        if log_match_data and log_match_data.get("SourceFile"):
+            log_target_session = log_match_data.get("SourceFile", "").strip()
+        else:
+            log_target_session = self.cb_session_select.get().strip()
 
         threading.Thread(target=run_background_logs, daemon=True).start()
             
@@ -3536,12 +3544,15 @@ class PoomsaeReplicaGUI:
     def open_log(self):
         self.export_match_log(auto_open=True)
 
-    def export_match_log(self, auto_open=False):
+    def export_match_log(self, auto_open=False, target_session=None):
         # 優先從當前比賽資料取得 SourceFile (場次)，若無則從下拉選單取得
-        if self.current_match_data and self.current_match_data.get("SourceFile"):
-            target_session = self.current_match_data.get("SourceFile", "").strip()
+        if target_session is None:
+            if self.current_match_data and self.current_match_data.get("SourceFile"):
+                target_session = self.current_match_data.get("SourceFile", "").strip()
+            else:
+                target_session = self.cb_session_select.get().strip()
         else:
-            target_session = self.cb_session_select.get().strip()
+            target_session = str(target_session).strip()
             
         if not target_session:
             if auto_open:
@@ -3698,16 +3709,8 @@ class PoomsaeReplicaGUI:
                 accs = [s[2] for s in scores_list]
                 pres = [s[3] for s in scores_list]
                 
-                def calc_trimmed_avg(val_list):
-                    if not val_list: return 0.0
-                    normalized = [round(float(value), 1) for value in val_list]
-                    if len(normalized) <= 3: return sum(normalized) / len(normalized)
-                    normalized.sort()
-                    valid = normalized[1:-1]
-                    return sum(valid) / len(valid)
-                
-                avg_acc = calc_trimmed_avg(accs)
-                avg_pres = calc_trimmed_avg(pres)
+                avg_acc = trimmed_average(accs)
+                avg_pres = trimmed_average(pres)
                 total_raw = sum(round(float(value), 1) for value in accs + pres)
                 return avg_acc, avg_pres, total_raw
 
@@ -3759,6 +3762,8 @@ class PoomsaeReplicaGUI:
                 
                 ded_1r_chung = get_deduction(chung_side_rows, 1)
                 ded_2r_chung = get_deduction(chung_side_rows, 2)
+                chung_deductions = ([ded_1r_chung] if r1_scores_chung else []) + ([ded_2r_chung] if r2_scores_chung else [])
+                total_ded_chung = sum(chung_deductions) / len(chung_deductions) if chung_deductions else 0.0
                 
                 r1_avg = r1_avg_acc + r1_avg_pres - ded_1r_chung if r1_scores_chung else 0.0
                 r2_avg = r2_avg_acc + r2_avg_pres - ded_2r_chung if r2_scores_chung else 0.0
@@ -3781,7 +3786,7 @@ class PoomsaeReplicaGUI:
                     
                 r1_text = f"{r1_avg_acc:.3f} / {r1_avg_pres:.3f} / {ded_1r_chung:.1f} / {r1_avg:.3f} / {r1_total_raw:.1f}" if r1_scores_chung else ""
                 r2_text = f"{r2_avg_acc:.3f} / {r2_avg_pres:.3f} / {ded_2r_chung:.1f} / {r2_avg:.3f} / {r2_total_raw:.1f}" if r2_scores_chung else ""
-                total_text = f"{avg_acc_chung:.3f} / {avg_pres_chung:.3f} / {ded_1r_chung:.1f} / {total_avg:.3f} / {total_raw:.1f}" if r1_scores_chung else ""
+                total_text = f"{avg_acc_chung:.3f} / {avg_pres_chung:.3f} / {total_ded_chung:.1f} / {total_avg:.3f} / {total_raw:.1f}" if r1_scores_chung else ""
                 
                 # 初始化紅方欄位
                 r1_text_hong = ""
@@ -3802,6 +3807,8 @@ class PoomsaeReplicaGUI:
                     
                     ded_1r_hong = get_deduction(hong_side_rows, 1)
                     ded_2r_hong = get_deduction(hong_side_rows, 2)
+                    hong_deductions = ([ded_1r_hong] if r1_scores_hong else []) + ([ded_2r_hong] if r2_scores_hong else [])
+                    total_ded_hong = sum(hong_deductions) / len(hong_deductions) if hong_deductions else 0.0
                     
                     r1_avg_h = r1_avg_acc_h + r1_avg_pres_h - ded_1r_hong if r1_scores_hong else 0.0
                     r2_avg_h = r2_avg_acc_h + r2_avg_pres_h - ded_2r_hong if r2_scores_hong else 0.0
@@ -3824,7 +3831,7 @@ class PoomsaeReplicaGUI:
                         
                     r1_text_hong = f"{r1_avg_acc_h:.3f} / {r1_avg_pres_h:.3f} / {ded_1r_hong:.1f} / {r1_avg_h:.3f} / {r1_total_raw_h:.1f}" if r1_scores_hong else ""
                     r2_text_hong = f"{r2_avg_acc_h:.3f} / {r2_avg_pres_h:.3f} / {ded_2r_hong:.1f} / {r2_avg_h:.3f} / {r2_total_raw_h:.1f}" if r2_scores_hong else ""
-                    total_text_hong = f"{avg_acc_hong:.3f} / {avg_pres_hong:.3f} / {ded_1r_hong:.1f} / {total_avg_h:.3f} / {total_raw_h:.1f}" if r1_scores_hong else ""
+                    total_text_hong = f"{avg_acc_hong:.3f} / {avg_pres_hong:.3f} / {total_ded_hong:.1f} / {total_avg_h:.3f} / {total_raw_h:.1f}" if r1_scores_hong else ""
                 
                 # 輸出成績資料行 (PK時同時印出青紅雙方成績)
                 html_block += f"""<tr>
@@ -4293,19 +4300,12 @@ class PoomsaeReplicaGUI:
                 r_scores[r_num]["pres"].append(pres)
                 r_scores[r_num]["ded"].append(ded)
                 
-            def calc_avg(scores):
-                if not scores: return 0.0
-                normalized = [round(float(score), 1) for score in scores]
-                if len(normalized) <= 3: return sum(normalized) / len(normalized)
-                scores_sorted = sorted(normalized)
-                valid = scores_sorted[1:-1]
-                return sum(valid) / len(valid)
                     
             r_averages = []
             r_pres_averages = []
             for r_num, sdata in r_scores.items():
-                avg_acc = calc_avg(sdata["acc"])
-                avg_pres = calc_avg(sdata["pres"])
+                avg_acc = trimmed_average(sdata["acc"])
+                avg_pres = trimmed_average(sdata["pres"])
                 deduction = sdata["ded"][0] if sdata["ded"] else 0.0
                 
                 r_averages.append(avg_acc + avg_pres - deduction)
@@ -4640,4 +4640,3 @@ INTERNAL_SCHEME = 'https' if USE_SSL else 'http'
 _INTERNAL_SSL_CTX = _ssl_module.SSLContext(_ssl_module.PROTOCOL_TLS_CLIENT)
 _INTERNAL_SSL_CTX.check_hostname = False
 _INTERNAL_SSL_CTX.verify_mode = _ssl_module.CERT_NONE
-

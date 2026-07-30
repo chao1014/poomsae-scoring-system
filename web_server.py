@@ -7,6 +7,7 @@ from flask_socketio import SocketIO, emit, disconnect
 import socket
 import config
 import database
+from scoring import trimmed_average
 
 state_lock = threading.RLock()
 connection_log_lock = threading.Lock()
@@ -676,18 +677,8 @@ def _check_all_submitted_main_thread():
             acc_list = [j['acc'] for j in submitted_judges]
             pres_list = [j['pres'] for j in submitted_judges]
         
-        def calc_avg(scores):
-            if not scores: return 0.0
-            # Judge inputs use 0.1-point units. Normalize before averaging
-            # so binary-float noise cannot change the third decimal place.
-            scores_only = [round(float(score), 1) for score in scores]
-            if len(scores_only) <= 3: return sum(scores_only) / len(scores_only)
-            scores_only.sort()
-            valid = scores_only[1:-1]
-            return sum(valid) / len(valid)
-
-        avg_acc = calc_avg(acc_list)
-        avg_pres = calc_avg(pres_list)
+        avg_acc = trimmed_average(acc_list)
+        avg_pres = trimmed_average(pres_list)
         
         try: deduction = float(gui.lbl_deduction_val.cget("text"))
         except: deduction = 0.0
@@ -709,8 +700,8 @@ def _check_all_submitted_main_thread():
         gui.center_stats_labels["Total_L_1"].config(text=f"{sum_pres:.1f}")
         gui.center_stats_labels["Total_L_2"].config(text=f"{raw_sum:.1f}")
         
-        gui.center_stats_labels["Avg_L_0"].config(text=f"{avg_acc:.2f}")
-        gui.center_stats_labels["Avg_L_1"].config(text=f"{avg_pres:.2f}")
+        gui.center_stats_labels["Avg_L_0"].config(text=f"{avg_acc:.3f}")
+        gui.center_stats_labels["Avg_L_1"].config(text=f"{avg_pres:.3f}")
         gui.center_stats_labels["Avg_L_2"].config(text=f"{final_score:.3f}")
         
         mode = gui.mode_var.get()
@@ -724,8 +715,8 @@ def _check_all_submitted_main_thread():
                 hong_acc_list = [j.get('hong_acc', 0.0) for j in submitted_judges]
                 hong_pres_list = [j.get('hong_pres', 0.0) for j in submitted_judges]
                 
-                hong_avg_acc = calc_avg(hong_acc_list)
-                hong_avg_pres = calc_avg(hong_pres_list)
+                hong_avg_acc = trimmed_average(hong_acc_list)
+                hong_avg_pres = trimmed_average(hong_pres_list)
                 
                 try: deduction_R = float(gui.lbl_deduction_val_R.cget("text"))
                 except: deduction_R = 0.0
@@ -741,8 +732,8 @@ def _check_all_submitted_main_thread():
                 gui.center_stats_labels["Total_R_1"].config(text=f"{hong_sum_pres:.1f}")
                 gui.center_stats_labels["Total_R_2"].config(text=f"{hong_raw_sum:.1f}")
                 
-                gui.center_stats_labels["Avg_R_0"].config(text=f"{hong_avg_acc:.2f}")
-                gui.center_stats_labels["Avg_R_1"].config(text=f"{hong_avg_pres:.2f}")
+                gui.center_stats_labels["Avg_R_0"].config(text=f"{hong_avg_acc:.3f}")
+                gui.center_stats_labels["Avg_R_1"].config(text=f"{hong_avg_pres:.3f}")
                 gui.center_stats_labels["Avg_R_2"].config(text=f"{hong_final_score:.3f}")
                 
                 gui.lbl_final_R.config(text=f"{hong_final_score:.3f}")
@@ -906,22 +897,14 @@ def calc_pk_history_scores():
         scores_by_grp[grp_key]['total'].append(tot)
         scores_by_grp[grp_key]['ded'].append(ded)
         
-    def calc_avg(scores):
-        if not scores: return 0.0
-        scores_only = [round(float(score), 1) for score in scores]
-        if len(scores_only) <= 3: return sum(scores_only) / len(scores_only)
-        scores_only.sort()
-        valid = scores_only[1:-1]
-        return sum(valid) / len(valid)
-        
     def calc_group_metrics(grp_data):
         if not grp_data: return {'total': 0.0, 'pres': 0.0, 'raw_sum': 0.0}
         accs = grp_data['acc']
         press = grp_data['pres']
         deds = grp_data['ded']
         
-        avg_acc = calc_avg(accs)
-        avg_pres = calc_avg(press)
+        avg_acc = trimmed_average(accs)
+        avg_pres = trimmed_average(press)
         deduction = max(deds) if deds else 0.0
         final = avg_acc + avg_pres - deduction
         raw_sum = sum(round(float(score), 1) for score in grp_data['total'])
