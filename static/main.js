@@ -526,8 +526,8 @@ function applyStopScoringUI(data) {
         const hongR1 = pkScores.hong_1r !== undefined ? pkScores.hong_1r : 0.0;
         const cR1El = document.getElementById('pk-res-chung-r1');
         const hR1El = document.getElementById('pk-res-hong-r1');
-        if (cR1El) cR1El.innerText = chungR1.toFixed(2);
-        if (hR1El) hR1El.innerText = hongR1.toFixed(2);
+        if (cR1El) cR1El.innerText = chungR1.toFixed(3);
+        if (hR1El) hR1El.innerText = hongR1.toFixed(3);
         
         const pkResR2Board = document.getElementById('pk-res-r2-board');
         if (stage === 2) {
@@ -539,8 +539,8 @@ function applyStopScoringUI(data) {
             const hR2El = document.getElementById('pk-res-hong-r2');
             const cFinEl = document.getElementById('pk-res-chung-final');
             const hFinEl = document.getElementById('pk-res-hong-final');
-            if (cR2El) cR2El.innerText = chungR2.toFixed(2);
-            if (hR2El) hR2El.innerText = hongR2.toFixed(2);
+            if (cR2El) cR2El.innerText = chungR2.toFixed(3);
+            if (hR2El) hR2El.innerText = hongR2.toFixed(3);
             if (cFinEl) cFinEl.innerText = chungFinal.toFixed(3);
             if (hFinEl) hFinEl.innerText = hongFinal.toFixed(3);
             if (pkResR2Board) pkResR2Board.classList.remove('hidden');
@@ -1874,7 +1874,6 @@ function applyProjectionSlide(data) {
                 if (isFlashing) row.classList.add('flashing-row');
                 let displayScore = Number(player.score);
                 displayScore = Number.isFinite(displayScore) ? displayScore.toFixed(3) : '-';
-                if (displayScore === '10.000') displayScore = '10.00';
                 const textColor = isFlashing ? '#ffff00' : '#ffffff';
 
                 const rankBadge = document.createElement('div');

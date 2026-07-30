@@ -1477,7 +1477,7 @@ class PoomsaeReplicaGUI:
                     if show_chung:
                         self.score_cells[idx][0].config(text=f"{data.get('acc', 0.0):.1f}")
                         self.score_cells[idx][1].config(text=f"{data.get('pres', 0.0):.1f}")
-                        self.score_cells[idx][2].config(text=f"{data.get('total', 0.0):.2f}")
+                        self.score_cells[idx][2].config(text=f"{data.get('total', 0.0):.3f}")
                     else:
                         self.score_cells[idx][0].config(text="")
                         self.score_cells[idx][1].config(text="")
@@ -1486,7 +1486,7 @@ class PoomsaeReplicaGUI:
                     # 紅方顯示 (PK 賽制)
                     if is_pk:
                         if show_hong:
-                            self.score_cells[idx][4].config(text=f"{data.get('hong_total', 0.0):.2f}")
+                            self.score_cells[idx][4].config(text=f"{data.get('hong_total', 0.0):.3f}")
                             self.score_cells[idx][5].config(text=f"{data.get('hong_pres', 0.0):.1f}")
                             self.score_cells[idx][6].config(text=f"{data.get('hong_acc', 0.0):.1f}")
                         else:
