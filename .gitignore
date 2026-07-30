@@ -29,3 +29,6 @@ temp_update/
 
 # Archives
 *.zip
+.sys_time.dat
+diff.patch
+license.lic
