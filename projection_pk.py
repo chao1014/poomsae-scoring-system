@@ -48,6 +48,9 @@ class PKProjectionWindow(tk.Toplevel):
         self.active_match_uuid = None
         self._blink_on = True
         self._blink_timer_id = None
+        self._round_blink_on = False
+        self._round_blink_timer_id = None
+        self._round_blink_key = None
         
         self.judge_rects = []
         self.judge_texts = []
@@ -166,6 +169,17 @@ class PKProjectionWindow(tk.Toplevel):
         bg2 = self.draw_gradient_y_on_canvas(self.canvas, x_bot1, H - Bh, x_bot2, H, "#252525", "#0c0c0c")
         bg3 = self.draw_gradient_y_on_canvas(self.canvas, x_bot2, H - Bh, W, H, "#252525", "#0c0c0c")
         self.bot_three_bg.extend(bg1 + bg2 + bg3)
+
+        # 目前評分回合以金色框線與底色高亮，讓觀眾可立即辨識正在進行的品勢。
+        self.round_panel_1 = self.canvas.create_rectangle(
+            x_bot1 + 4, H - Bh + 4, x_bot2 - 4, H - 4,
+            fill="", outline="#555555", width=1
+        )
+        self.round_panel_2 = self.canvas.create_rectangle(
+            x_bot2 + 4, H - Bh + 4, W - 4, H - 4,
+            fill="", outline="#555555", width=1
+        )
+        self.bot_three_bg.extend([self.round_panel_1, self.round_panel_2])
         
         # 三格文字
         self.txt_status = self.canvas.create_text(
@@ -544,7 +558,8 @@ class PKProjectionWindow(tk.Toplevel):
             self.active_match_uuid = gui.current_match_uuid
         
         match_data = gui.current_match_data
-        
+        if not match_data:
+            self._stop_round_blink()
         # 1. 狀態 / 時間顯示邏輯
         status_display = ""
         current_status_text = getattr(self, 'status_text', '')
@@ -847,6 +862,13 @@ class PKProjectionWindow(tk.Toplevel):
                 self.canvas.itemconfig(self.txt_2r, text=p2 if p2 else "---")
                 self.canvas.itemconfigure(self.txt_1r, state=general_frame_state)
                 self.canvas.itemconfigure(self.txt_2r, state=general_frame_state)
+
+                # 僅在主控台按下「準備」鎖定比賽後，閃爍目前評分的品勢。
+                self._update_round_blink(
+                    getattr(gui, 'current_stage', 1),
+                    enabled=bool(getattr(gui, 'is_locked', False)),
+                    has_second_round=bool(p2),
+                )
             except: pass
             
         else:
@@ -955,7 +977,7 @@ class PKProjectionWindow(tk.Toplevel):
                 try:
                     import sqlite3
                     import database
-                    conn = sqlite3.connect(database.get_db_path())
+                    conn = database.get_connection()
                     c = conn.cursor()
                     c.execute("""
                         SELECT round, player_side, judge_id, accuracy, presentation, p1, p2, p3, deduction, total
@@ -1368,7 +1390,7 @@ class PKProjectionWindow(tk.Toplevel):
                     f.write(f"Projection rows: {json.dumps(rows, ensure_ascii=False)}\n")
                 if not rows:
                     try:
-                        conn = sqlite3.connect(database.get_db_path())
+                        conn = database.get_connection()
                         c = conn.cursor()
                         c.execute("""
                             SELECT round, player_side, accuracy, presentation, deduction, total
@@ -1600,6 +1622,57 @@ class PKProjectionWindow(tk.Toplevel):
                     update_bot_table_row(self.hong_bot_table_texts, 0, hong_1r)
                     update_bot_table_row(self.hong_bot_table_texts, 1, hong_2r)
 
+
+    def _paint_round_highlight(self, active_round=None):
+        """繪製回合欄位；active_round 為 None 時顯示中性樣式。"""
+        for round_num, panel, text_item in (
+            (1, self.round_panel_1, self.txt_1r),
+            (2, self.round_panel_2, self.txt_2r),
+        ):
+            is_active = active_round == round_num
+            self.canvas.itemconfig(
+                panel,
+                fill="#4a3508" if is_active else "",
+                outline="#ffd54a" if is_active else "#555555",
+                width=3 if is_active else 1,
+            )
+            self.canvas.itemconfig(text_item, fill="#fff1a8" if is_active else "#d0d0d0")
+
+    def _update_round_blink(self, current_round, enabled, has_second_round):
+        """在比賽準備完成後，僅讓正在評分的回合欄位閃爍。"""
+        active_round = current_round if current_round == 1 or (current_round == 2 and has_second_round) else None
+        key = (active_round, enabled)
+        if not enabled or active_round is None:
+            self._stop_round_blink()
+            return
+        if self._round_blink_key == key and self._round_blink_timer_id is not None:
+            return
+        self._stop_round_blink()
+        self._round_blink_key = key
+        self._round_blink_on = True
+        self._paint_round_highlight(active_round)
+        self._round_blink_timer_id = self.after(1000, self._round_blink_tick)
+
+    def _round_blink_tick(self):
+        if not self.winfo_exists() or self._round_blink_key is None:
+            return
+        active_round, enabled = self._round_blink_key
+        if not enabled:
+            self._stop_round_blink()
+            return
+        self._round_blink_on = not self._round_blink_on
+        self._paint_round_highlight(active_round if self._round_blink_on else None)
+        self._round_blink_timer_id = self.after(1000, self._round_blink_tick)
+
+    def _stop_round_blink(self):
+        if self._round_blink_timer_id is not None:
+            try: self.after_cancel(self._round_blink_timer_id)
+            except: pass
+        self._round_blink_timer_id = None
+        self._round_blink_key = None
+        self._round_blink_on = False
+        if hasattr(self, 'round_panel_1'):
+            self._paint_round_highlight()
 
     def _start_blink(self, side):
         """啟動指定方位的狀態燈閃爍效果（side: 'chung' 或 'hong'）"""

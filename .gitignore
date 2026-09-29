@@ -10,8 +10,8 @@ dist/
 
 # Logs
 *.log
-match_logs/
-daily_logs/
+場次log/
+每日比賽log/
 
 # Databases
 *.db
@@ -25,10 +25,22 @@ ngrok_config.json
 cloudflared.exe
 
 # Temporary files
-temp_update/
+更新暫存/
 
 # Archives
 *.zip
 .sys_time.dat
 diff.patch
 license.lic
+settings.json
+
+court_access_key.txt
+score_hub_sources.json
+score_hub_cache.json
+score_hub_sources.tmp
+score_hub_cache.tmp
+
+court_device_id.txt
+score_hub_received.json
+score_hub_received.tmp
+後台資料庫/

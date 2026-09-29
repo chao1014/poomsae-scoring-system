@@ -8,36 +8,84 @@ import database
 
 def open_settings(gui_parent):
     top = tk.Toplevel(gui_parent.root)
-    top.title("系統設定")
-    gui_parent.center_window(top, 660, 760)
-    top.configure(bg="#f8f9fa")
+    top.title("系統參數設定")
+    width = min(800, top.winfo_screenwidth() - 40)
+    height = min(740, top.winfo_screenheight() - 80)
+    gui_parent.center_window(top, width, height)
+    top.minsize(min(620, width), min(480, height))
+    top.configure(bg="#eef3f8")
     top.transient(gui_parent.root)
     top.grab_set()
-    
-    # 頂部精緻標題
-    header_frame = tk.Frame(top, bg="#0099cc", height=50)
-    header_frame.pack(fill="x", side="top")
-    header_frame.pack_propagate(False)
-    lbl_title = tk.Label(header_frame, text="⚙️ 系統參數設定", font=("Microsoft JhengHei", 12, "bold"), fg="#ffffff", bg="#0099cc")
-    lbl_title.pack(pady=12)
-    
-    # 白底卡片容器
-    card_frame = tk.Frame(top, bg="#ffffff", bd=1, relief="solid", highlightthickness=0)
-    card_frame.pack(fill="both", expand=True, padx=20, pady=(15, 10))
-    
-    card_frame.columnconfigure(0, weight=1, minsize=120)
-    card_frame.columnconfigure(1, weight=2)
-    
-    lbl_font = ("Microsoft JhengHei", 10, "bold")
-    entry_font = ("Microsoft JhengHei", 10)
-    lbl_fg = "#2c3e50"
-    
+
+    font = "Microsoft JhengHei"
+    header = tk.Frame(top, bg="#142d4e", padx=26, pady=20)
+    header.pack(fill="x")
+    tk.Label(header, text="系統參數設定", font=(font, 20, "bold"),
+             fg="white", bg="#142d4e").pack(anchor="w")
+    tk.Label(header, text="設定賽事、計分規則與場地連線", font=(font, 10),
+             fg="#b9cde5", bg="#142d4e").pack(anchor="w", pady=(5, 0))
+
+    # Reserve the footer before the expanding content so actions stay visible.
+    btn_frame = tk.Frame(top, bg="white", padx=22, pady=14)
+    btn_frame.pack(fill="x", side="bottom")
+    tk.Label(btn_frame, text="一般設定於儲存後套用", bg="white",
+             fg="#64748b", font=(font, 9)).pack(side="left")
+
+    style = ttk.Style(top)
+    style.configure("Settings.TNotebook", background="#eef3f8", borderwidth=0)
+    style.configure("Settings.TNotebook.Tab", font=(font, 10, "bold"), padding=(18, 10))
+    notebook = ttk.Notebook(top, style="Settings.TNotebook")
+    notebook.pack(fill="both", expand=True, padx=18, pady=(16, 12))
+    pages = {}
+    canvases = {}
+    for name in ("賽事與連線", "計分與展示", "品勢與抽籤"):
+        page = tk.Frame(notebook, bg="#eef3f8")
+        notebook.add(page, text=name)
+        canvas = tk.Canvas(page, bg="#eef3f8", highlightthickness=0)
+        scrollbar = ttk.Scrollbar(page, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        body = tk.Frame(canvas, bg="#eef3f8")
+        item = canvas.create_window((0, 0), window=body, anchor="nw")
+        canvas.bind("<Configure>", lambda e, c=canvas, i=item: c.itemconfigure(i, width=e.width))
+        body.bind("<Configure>", lambda e, c=canvas: c.configure(scrollregion=c.bbox("all")))
+        pages[name] = body
+        canvases[str(page)] = canvas
+
+    def scroll_page(event):
+        canvas = canvases.get(notebook.select())
+        if canvas and canvas.bbox("all") and canvas.bbox("all")[3] > canvas.winfo_height():
+            canvas.yview_scroll(-int(event.delta / 120), "units")
+
+    top.bind("<MouseWheel>", scroll_page)
+    lbl_font = (font, 10, "bold")
+    entry_font = (font, 10)
+    lbl_fg = "#334155"
+    card_frame = None
     r = 0
+    section_specs = {
+        "📋 基礎與場地設定": ("賽事與連線", "賽事與場地", "各場地使用相同賽事名稱，後台即可彙整到同一資料庫。"),
+        "⏱️ 計分與展示設定": ("計分與展示", "計分與展示", "調整裁判人數、比賽倒數與成績展示時間。"),
+        "🏆 PK 賽制專屬設定": ("計分與展示", "PK 上場順序", "選擇青、紅雙方的上場方式。"),
+        "🌐 後台比分同步": ("賽事與連線", "後台比分同步", "前台與後台需連接同一區域網路。IP 設定會立即套用。"),
+        "🥋 品勢型場設定": ("品勢與抽籤", "品勢與抽籤", "選擇型場資料來源，設定抽籤範圍與型場記憶。"),
+    }
+
     def create_section_header(title_text):
-        nonlocal r
-        lbl = tk.Label(card_frame, text=title_text, font=("Microsoft JhengHei", 9, "bold"), fg="#0099cc", bg="#ffffff", anchor="w")
-        lbl.grid(row=r, column=0, columnspan=2, sticky="w", padx=(15, 0), pady=(12, 4))
-        r += 1
+        nonlocal r, card_frame
+        page, title, description = section_specs[title_text]
+        card_frame = tk.Frame(pages[page], bg="white", highlightbackground="#dce5ef",
+                              highlightthickness=1, padx=16, pady=16)
+        card_frame.pack(fill="x", padx=2, pady=(12, 0))
+        card_frame.columnconfigure(0, minsize=142)
+        card_frame.columnconfigure(1, weight=1)
+        tk.Label(card_frame, text=title, font=(font, 13, "bold"), fg="#183b60",
+                 bg="white", anchor="w").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+        tk.Label(card_frame, text=description, font=(font, 9), fg="#64748b",
+                 bg="white", wraplength=550, justify="left").grid(
+                     row=1, column=0, columnspan=2, sticky="w", pady=(0, 16))
+        r = 2
 
     def create_form_row(label_text, var):
         nonlocal r
@@ -46,7 +94,7 @@ def open_settings(gui_parent):
         
         widget = tk.Entry(card_frame, textvariable=var, width=25, font=entry_font, relief="solid", bd=1, bg="#ffffff", highlightthickness=1)
         widget.config(highlightbackground="#cccccc", highlightcolor="#0099cc")
-        widget.grid(row=r, column=1, sticky="w", padx=(8, 15), pady=6)
+        widget.grid(row=r, column=1, sticky="ew", padx=(8, 15), pady=6)
         r += 1
         return widget
 
@@ -81,7 +129,7 @@ def open_settings(gui_parent):
                 width=btn_width, 
                 height=1, 
                 padx=2, 
-                pady=1,
+                pady=6,
                 cursor="hand2",
                 relief="flat",
                 bd=0,
@@ -132,12 +180,70 @@ def open_settings(gui_parent):
     var_pk_seq = tk.IntVar(value=config.system_settings.get("pk_sequence_mode", 1))
     create_button_selector_row("打分順序模式:", var_pk_seq, [0, 1, 2], ["同時上場", "交叉上場", "依序上場"], btn_width=8)
     
-    # 3. 網路與雲端設定
-    create_section_header("🌐 網路與雲端設定")
-    
-    var_cloud = tk.StringVar(value="啟用" if config.system_settings.get("enable_cloud", True) else "停用")
-    create_button_selector_row("啟用雲端連線:", var_cloud, ["啟用", "停用"], ["啟用", "停用"], btn_width=6)
-    
+    # 3. 後台比分同步
+    import lan_records
+    create_section_header("🌐 後台比分同步")
+    connection = tk.Frame(card_frame, bg="#f0f5fb", padx=18, pady=16)
+    connection.grid(row=r, column=0, columnspan=2, sticky="ew")
+    connection.columnconfigure(0, weight=1)
+    tk.Label(connection, text="後台電腦 IP", font=(font, 9),
+             fg="#64748b", bg="#f0f5fb").grid(row=0, column=0, sticky="w")
+    hub_address = tk.StringVar()
+    tk.Label(connection, textvariable=hub_address, font=("Consolas", 21, "bold"),
+             fg="#183b60", bg="#f0f5fb").grid(row=1, column=0, sticky="w", pady=(4, 0))
+    tk.Button(connection, text="設定後台 IP", command=lambda: open_hub_settings(top),
+              bg="#1864ab", fg="white", activebackground="#134f87", activeforeground="white",
+              font=(font, 10, "bold"), padx=14, pady=10, cursor="hand2",
+              relief="flat", bd=0).grid(row=0, column=1, rowspan=2, sticky="e", padx=(12, 0))
+
+    state_row = tk.Frame(card_frame, bg="white")
+    state_row.grid(row=r+1, column=0, columnspan=2, sticky="ew", pady=(16, 0))
+    hub_badge = tk.Label(state_row, font=(font, 10, "bold"), padx=10, pady=5)
+    hub_badge.pack(side="left")
+    hub_time = tk.StringVar()
+    tk.Label(state_row, textvariable=hub_time, font=(font, 9), fg="#64748b",
+             bg="white").pack(side="right")
+    hub_detail = tk.StringVar()
+    detail_label = tk.Label(card_frame, textvariable=hub_detail, font=(font, 9),
+                           bg="white", fg="#64748b", anchor="w", justify="left")
+    detail_label.grid(row=r+2, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+    detail_label.bind("<Configure>", lambda e: detail_label.configure(wraplength=max(100, e.width)))
+    status_timer = None
+
+    def refresh_hub_summary():
+        nonlocal status_timer
+        if not top.winfo_exists():
+            return
+        host = config.system_settings.get("score_hub_ip", "").strip()
+        state = lan_records.status
+        hub_address.set(host or "尚未設定")
+        hub_time.set("")
+        if not host:
+            title, bg, fg = "未啟用同步", "#eef2f6", "#64748b"
+            detail = "設定後台 IP 後，完賽紀錄會自動傳送至後台。"
+        elif state.startswith("已同步至 " + host + "　"):
+            title, bg, fg = "● 已同步", "#e8f6ee", "#15803d"
+            hub_time.set("本次同步時間  " + state.rsplit("　", 1)[-1])
+            detail = "比分紀錄已送達後台，系統每 5 秒自動同步。"
+        elif "失敗" in state:
+            title, bg, fg = "● 同步失敗", "#fff1e7", "#b45309"
+            detail = state
+        elif state.startswith("正在同步"):
+            title, bg, fg = "● 同步中", "#e8f1fc", "#1864ab"
+            detail = "正在傳送場次紀錄，請保持區域網路連線。"
+        else:
+            title, bg, fg = "● 等待同步", "#e8f1fc", "#1864ab"
+            detail = "已設定後台 IP，等待下一輪自動同步。"
+        hub_badge.configure(text=title, bg=bg, fg=fg)
+        hub_detail.set(detail)
+        status_timer = top.after(1000, refresh_hub_summary)
+
+    def cancel_status_timer(event):
+        if event.widget is top and status_timer:
+            top.after_cancel(status_timer)
+
+    top.bind("<Destroy>", cancel_status_timer, add="+")
+    refresh_hub_summary()
     # 4. 品勢型場設定
     create_section_header("🥋 品勢型場設定")
     
@@ -269,10 +375,6 @@ def open_settings(gui_parent):
     
     r += 1
     
-    # 底部按鈕區
-    btn_frame = tk.Frame(top, bg="#f8f9fa")
-    btn_frame.pack(fill="x", side="bottom", pady=(0, 15))
-    
     def save():
         try:
             cd_val = var_cd.get()
@@ -280,7 +382,6 @@ def open_settings(gui_parent):
             judge_val = var_judge.get()
             court_val = var_court.get()
             name_val = var_name.get().strip()
-            cloud_val = var_cloud.get()
             
             if not name_val:
                 messagebox.showerror("錯誤", "賽事名稱不能為空", parent=top)
@@ -295,10 +396,6 @@ def open_settings(gui_parent):
             if name_val != config.system_settings["tournament_name"]:
                 config.system_settings["tournament_name"] = name_val
                 database.set_tournament_db(name_val)
-            
-            old_enable = config.system_settings.get("enable_cloud", True)
-            new_enable = (cloud_val == "啟用")
-            config.system_settings["enable_cloud"] = new_enable
             
             excel_val = var_excel.get().strip()
             config.system_settings["poomsae_excel_path"] = excel_val
@@ -336,120 +433,66 @@ def open_settings(gui_parent):
             if hasattr(gui_parent, 'refresh_bottom_buttons'):
                 gui_parent.refresh_bottom_buttons()
             
-            # 觸發雲端通道動態重啟或關閉
-            if old_enable != new_enable:
-                if new_enable:
-                    if hasattr(gui_parent, 'start_tunnel_callback') and gui_parent.start_tunnel_callback:
-                        import threading
-                        threading.Thread(target=gui_parent.start_tunnel_callback, daemon=True).start()
-                else:
-                    if hasattr(gui_parent, 'stop_tunnel_callback') and gui_parent.stop_tunnel_callback:
-                        gui_parent.stop_tunnel_callback()
-            
             messagebox.showinfo("設定", "設定已成功儲存與應用！", parent=top)
             top.destroy()
         except Exception as ex:
             messagebox.showerror("錯誤", f"儲存失敗，請檢查輸入內容是否為有效數字。\n{ex}", parent=top)
 
     # 取消與儲存按鈕
-    btn_cancel = tk.Button(btn_frame, text="取消設定", font=("Microsoft JhengHei", 10, "bold"), fg="#ffffff", bg="#7f8c8d", relief="flat", width=12, height=1, command=top.destroy)
-    btn_cancel.pack(side="left", padx=30)
+    btn_cancel = tk.Button(btn_frame, text="取消", font=("Microsoft JhengHei", 10, "bold"), fg="#ffffff", bg="#7f8c8d", relief="flat", width=12, height=1, command=top.destroy)
+    btn_cancel.pack(side="right", padx=(8, 0))
     gui_parent.setup_hover(btn_cancel, "#95a5a6", "#7f8c8d")
     
-    btn_save = tk.Button(btn_frame, text="保存並應用", font=("Microsoft JhengHei", 10, "bold"), fg="#ffffff", bg="#0099cc", relief="flat", width=12, height=1, command=save)
-    btn_save.pack(side="right", padx=30)
+    btn_save = tk.Button(btn_frame, text="儲存並套用", font=("Microsoft JhengHei", 10, "bold"), fg="#ffffff", bg="#0099cc", relief="flat", width=12, height=1, command=save)
+    btn_save.pack(side="right", padx=(12, 0))
     gui_parent.setup_hover(btn_save, "#00b0f0", "#0099cc")
+    btn_cancel.configure(bg="#e8eef5", fg="#334155", pady=7, width=8)
+    btn_save.configure(pady=7)
+    gui_parent.setup_hover(btn_cancel, "#dbe5f0", "#e8eef5")
+    return top
 
 
 def show_qr_popup(gui_parent, event=None):
     try:
-        enable_cloud = config.system_settings.get("enable_cloud", True)
-        
         top = tk.Toplevel(gui_parent.root)
         top.title("掃描連線")
-        
-        # 依據是否啟用雲端動態調整寬度
-        window_width = 860 if enable_cloud else 550
-        window_height = 600
-        gui_parent.center_window(top, window_width, window_height)
+        gui_parent.center_window(top, 550, 600)
         top.configure(bg="white")
-        
-        lbl_title = tk.Label(top, text="📱 請裁判使用手機掃描以下二維碼連線", font=("Microsoft JhengHei", 16, "bold"), bg="white")
-        lbl_title.pack(pady=15)
-        
-        # 建立左右或單一容器
+
+        tk.Label(top, text="📱 請裁判使用手機掃描以下二維碼連線",
+                 font=("Microsoft JhengHei", 16, "bold"), bg="white").pack(pady=15)
         container = tk.Frame(top, bg="white")
         container.pack(fill="both", expand=True, padx=20, pady=5)
-        
-        # 偵測 Pillow 的縮放過濾器名稱 (相容新舊版本)
+
         try:
             resample_filter = Image.Resampling.LANCZOS
         except AttributeError:
             resample_filter = Image.ANTIALIAS
-        
-        # 1. 區網連線 (區域網路 Wi-Fi)
-        left_frame = tk.Frame(container, bg="white", padx=10, pady=10, bd=1, relief="groove")
-        left_frame.pack(side="left", fill="both", expand=True, padx=10)
-        
-        lbl_left_title = tk.Label(left_frame, text="⚡ 區網連線 (推薦/超低延遲)", font=("Microsoft JhengHei", 12, "bold"), bg="white", fg="#27ae60")
-        lbl_left_title.pack(pady=5)
-        
-        local_ip = gui_parent.get_local_ip()
-        local_url = f"http://{local_ip}:5003"
-        
+
+        local_frame = tk.Frame(container, bg="white", padx=10, pady=10, bd=1, relief="groove")
+        local_frame.pack(fill="both", expand=True, padx=10)
+        tk.Label(local_frame, text="⚡ 區網連線（同一 Wi-Fi）",
+                 font=("Microsoft JhengHei", 12, "bold"), bg="white", fg="#27ae60").pack(pady=5)
+
+        local_url = f"http://{gui_parent.get_local_ip()}:5003"
         qr_local = qrcode.QRCode(version=1, box_size=8, border=2)
         qr_local.add_data(local_url)
         qr_local.make(fit=True)
         img_local = qr_local.make_image(fill_color="black", back_color="white")
         img_local = img_local.resize((260, 260), resample_filter)
         qr_local_photo = ImageTk.PhotoImage(img_local)
-        
-        lbl_qr_local = tk.Label(left_frame, image=qr_local_photo, bg="white")
-        lbl_qr_local.image = qr_local_photo  # keep reference
-        lbl_qr_local.pack(expand=True)
-        
-        lbl_local_url = tk.Label(left_frame, text=local_url, font=("Consolas", 9, "bold"), bg="white", fg="blue")
-        lbl_local_url.pack(pady=5)
-        
-        lbl_local_tip = tk.Label(left_frame, text="* 手機需與本主控電腦連接同一個 Wi-Fi 分享器", font=("Microsoft JhengHei", 8), bg="white", fg="gray")
-        lbl_local_tip.pack(pady=2)
 
-        # 2. 雲端連線 (僅在啟用雲端時顯示)
-        if enable_cloud:
-            right_frame = tk.Frame(container, bg="white", padx=10, pady=10, bd=1, relief="groove")
-            right_frame.pack(side="right", fill="both", expand=True, padx=10)
-            
-            lbl_right_title = tk.Label(right_frame, text="🌐 雲端連線 (網際網路安全通道)", font=("Microsoft JhengHei", 12, "bold"), bg="white", fg="#8e58ff")
-            lbl_right_title.pack(pady=5)
-            
-            cloud_url = gui_parent.cloudflare_url if (hasattr(gui_parent, 'cloudflare_url') and gui_parent.cloudflare_url) else ""
-            
-            if cloud_url:
-                qr_cloud = qrcode.QRCode(version=1, box_size=8, border=2)
-                qr_cloud.add_data(cloud_url)
-                qr_cloud.make(fit=True)
-                img_cloud = qr_cloud.make_image(fill_color="black", back_color="white")
-                img_cloud = img_cloud.resize((260, 260), resample_filter)
-                qr_cloud_photo = ImageTk.PhotoImage(img_cloud)
-                
-                lbl_qr_cloud = tk.Label(right_frame, image=qr_cloud_photo, bg="white")
-                lbl_qr_cloud.image = qr_cloud_photo  # keep reference
-                lbl_qr_cloud.pack(expand=True)
-                
-                lbl_cloud_url = tk.Label(right_frame, text=cloud_url, font=("Consolas", 9, "bold"), bg="white", fg="purple")
-                lbl_cloud_url.pack(pady=5)
-            else:
-                lbl_no_cloud = tk.Label(right_frame, text="通道尚未啟動\n或啟動失敗", font=("Microsoft JhengHei", 12), bg="white", fg="red")
-                lbl_no_cloud.pack(expand=True)
-                
-            lbl_cloud_tip = tk.Label(right_frame, text="* 適用於無法連接同一個 Wi-Fi 時跨網路連線\n* 手機與本主控電腦皆必須連通網際網路 (可開 4G/5G)", font=("Microsoft JhengHei", 8), bg="white", fg="gray", justify="left")
-            lbl_cloud_tip.pack(pady=2)
-            
+        lbl_qr_local = tk.Label(local_frame, image=qr_local_photo, bg="white")
+        lbl_qr_local.image = qr_local_photo
+        lbl_qr_local.pack(expand=True)
+        tk.Label(local_frame, text=local_url, font=("Consolas", 9, "bold"),
+                 bg="white", fg="blue").pack(pady=5)
+        tk.Label(local_frame, text="* 手機需與本主控電腦連接同一個 Wi-Fi 分享器",
+                 font=("Microsoft JhengHei", 8), bg="white", fg="gray").pack(pady=2)
         return top
     except Exception as e:
         print(f"QR Code 彈窗失敗: {e}")
         return None
-
 
 def open_match_editor(gui_parent, match_id=None):
     top = tk.Toplevel(gui_parent.root)
@@ -733,9 +776,77 @@ def open_match_editor(gui_parent, match_id=None):
                          relief="flat", width=12, height=1, command=save_match)
     btn_save.pack(side="right", padx=45)
     gui_parent.setup_hover(btn_save, "#00b0f0", "#0099cc")
-
+    btn_cancel.configure(bg="#e8eef5", fg="#334155", pady=7, width=8)
+    btn_save.configure(pady=7)
+    gui_parent.setup_hover(btn_cancel, "#dbe5f0", "#e8eef5")
     # 新建模式：若預設場次已有資料，立即帶入基本資訊與最大籤號
     if not is_edit and var_session.get():
         on_session_selected()
 
 
+
+
+def open_hub_settings(parent):
+    """Edit the receiver address; changes apply independently of general settings."""
+    import lan_records
+    dialog = tk.Toplevel(parent)
+    dialog.title("設定後台 IP")
+    dialog.configure(bg="#eef3f8")
+    dialog.transient(parent)
+    width, height = 500, 340
+    parent.update_idletasks()
+    x = max(0, min(parent.winfo_rootx() + (parent.winfo_width()-width)//2,
+                   dialog.winfo_screenwidth()-width))
+    y = max(0, min(parent.winfo_rooty() + (parent.winfo_height()-height)//2,
+                   dialog.winfo_screenheight()-height))
+    dialog.geometry(f"{width}x{height}+{x}+{y}")
+    dialog.resizable(False, False)
+    dialog.grab_set()
+    font = "Microsoft JhengHei"
+    tk.Label(dialog, text="連接比分後台", font=(font, 17, "bold"),
+             fg="#183b60", bg="#eef3f8").pack(anchor="w", padx=24, pady=(22, 6))
+    tk.Label(dialog, text="請輸入後台電腦在同一區域網路中的 IP 位址。",
+             font=(font, 10), fg="#64748b", bg="#eef3f8").pack(anchor="w", padx=24)
+    card = tk.Frame(dialog, bg="white", padx=18, pady=16)
+    card.pack(fill="x", padx=24, pady=18)
+    tk.Label(card, text="後台 IP", bg="white", fg="#334155",
+             font=(font, 10, "bold")).pack(anchor="w")
+    address = tk.StringVar(value=config.system_settings.get("score_hub_ip", ""))
+    entry = tk.Entry(card, textvariable=address, font=("Consolas", 18),
+                     relief="flat", bg="#f0f5fb", highlightthickness=1,
+                     highlightbackground="#dce5ef", highlightcolor="#1864ab")
+    entry.pack(fill="x", pady=(8, 10), ipady=6)
+    tk.Label(card, text="例如 192.168.0.110；留空並套用可停用同步。",
+             font=(font, 9), fg="#64748b", bg="white").pack(anchor="w")
+    footer = tk.Frame(dialog, bg="#eef3f8")
+    footer.pack(fill="x", padx=24, pady=(0, 18))
+
+    def close():
+        dialog.destroy()
+        if parent.winfo_exists():
+            parent.grab_set()
+
+    def save_hub():
+        host = address.get().strip()
+        try:
+            if host:
+                lan_records.hub_url(host)
+        except ValueError as exc:
+            messagebox.showerror("IP 格式錯誤", str(exc), parent=dialog)
+            entry.focus_set()
+            return
+        config.system_settings["score_hub_ip"] = host
+        lan_records.status = "已設定後台 IP，等待下一輪同步：" + host if host else "未設定後台 IP（未同步）"
+        config.save_settings()
+        close()
+
+    tk.Button(footer, text="儲存並套用", command=save_hub, bg="#1864ab", fg="white",
+              font=(font, 10, "bold"), relief="flat", padx=18, pady=9).pack(side="right")
+    tk.Button(footer, text="取消", command=close, bg="#e1e9f2", fg="#334155",
+              font=(font, 10), relief="flat", padx=18, pady=9).pack(side="right", padx=10)
+    dialog.protocol("WM_DELETE_WINDOW", close)
+    dialog.bind("<Escape>", lambda e: close())
+    entry.bind("<Return>", lambda e: save_hub())
+    entry.focus_set()
+    entry.selection_range(0, "end")
+    return dialog

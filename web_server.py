@@ -874,7 +874,7 @@ def calc_pk_history_scores():
         try:
             import sqlite3
             import database
-            conn = sqlite3.connect(database.get_db_path())
+            conn = database.get_connection()
             c = conn.cursor()
             c.execute("""
                 SELECT round, player_side, accuracy, presentation, deduction, total

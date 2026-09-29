@@ -23,7 +23,7 @@ def backup_poomsae_data():
     backed_up = []
     
     # 1. 備份檔案 (相容新舊路徑)
-    files_to_backup = ["license.lic", ".sys_time.dat", "settings.json", "ngrok_config.json"]
+    files_to_backup = ["license.lic", ".sys_time.dat", "settings.json"]
     
     # 自動搜尋並備份所有同級目錄下的 .db 檔
     db_files = []
@@ -295,30 +295,11 @@ def run_pyinstaller(script_name, exe_name, is_gui=False):
         return False
 
 def copy_config_files():
-    """複製 Ngrok 設定檔與 settings 到發布目錄"""
-    print("[*] 正在複製設定檔與 settings...")
+    """複製 settings 到發布目錄"""
+    print("[*] 正在複製 settings...")
     os.makedirs(POOMSAE_SYSTEM_DIR, exist_ok=True)
     
-    # 1. 同步 ngrok_config.json
-    config_src = os.path.join(BASE_DIR, "ngrok_config.json")
-    config_dst = os.path.join(POOMSAE_SYSTEM_DIR, "ngrok_config.json")
-    if os.path.exists(config_src):
-        shutil.copy2(config_src, config_dst)
-        print("  - 設定檔 ngrok_config.json 已成功複製到發布目錄。")
-    else:
-        # 如果不存在，建立一個預設範本
-        default_config = {
-            "auth_token": "請在此填寫您的_Auth_Token",
-            "domain": "請在此填寫您的_固定網域.ngrok-free.dev"
-        }
-        try:
-            with open(config_dst, 'w', encoding='utf-8') as f:
-                json.dump(default_config, f, indent=4, ensure_ascii=False)
-            print("  - 已在發布目錄下產生預設 ngrok_config.json 檔案。")
-        except Exception as e:
-            print(f"  - [WARN] 產生 ngrok_config.json 失敗: {e}")
-
-    # 2. 智慧合併 settings.json（保留使用者已有設定，補上開發端新增欄位）
+    # 智慧合併 settings.json（保留使用者已有設定，補上開發端新增欄位）
     settings_src = os.path.join(BASE_DIR, "settings.json")
     settings_dst = os.path.join(POOMSAE_SYSTEM_DIR, "settings.json")
     try:

@@ -60,6 +60,9 @@ class ProjectionWindow(tk.Toplevel):
         self.flash_row_idx = -1
         self.flash_timer_id = None
         self.flash_state = False
+        self._round_blink_on = False
+        self._round_blink_timer_id = None
+        self._round_blink_key = None
         self.score_slide_show_finished = False
         self.last_is_showing_score = False
         
@@ -72,6 +75,8 @@ class ProjectionWindow(tk.Toplevel):
         self.txt_status = None
         self.txt_1r = None
         self.txt_2r = None
+        self.round_panel_1 = None
+        self.round_panel_2 = None
         
         # 繪製背景與建立物件
         self.draw_background()
@@ -185,6 +190,17 @@ class ProjectionWindow(tk.Toplevel):
         bot_bg2 = self.draw_gradient_y(x_bot1, H - Bh, x_bot2, H, "#252525", "#0c0c0c")
         bot_bg3 = self.draw_gradient_y(x_bot2, H - Bh, Lw, H, "#252525", "#0c0c0c")
         self.general_bg_items.extend(bot_bg1 + bot_bg2 + bot_bg3)
+
+        # 目前評分回合以金色框線與底色高亮，讓觀眾可立即辨識正在進行的品勢。
+        self.round_panel_1 = self.canvas.create_rectangle(
+            x_bot1 + 4, H - Bh + 4, x_bot2 - 4, H - 4,
+            fill="", outline="#555555", width=1
+        )
+        self.round_panel_2 = self.canvas.create_rectangle(
+            x_bot2 + 4, H - Bh + 4, Lw - 4, H - 4,
+            fill="", outline="#555555", width=1
+        )
+        self.general_bg_items.extend([self.round_panel_1, self.round_panel_2])
         
         self.txt_status = self.canvas.create_text(
             x_bot1 / 2, H - Bh / 2, 
@@ -522,6 +538,8 @@ class ProjectionWindow(tk.Toplevel):
             
         # 1. 取得選手與賽事基本資料
         match_data = gui.current_match_data
+        if not match_data:
+            self._stop_round_blink()
         if match_data:
             no_text = str(match_data.get("No", ""))
             
@@ -1244,6 +1262,13 @@ class ProjectionWindow(tk.Toplevel):
         
         self.canvas.itemconfig(self.txt_1r, text=p1_display)
         self.canvas.itemconfig(self.txt_2r, text=p2_display)
+
+        # 僅在主控台按下「準備」鎖定比賽後，閃爍目前評分的品勢。
+        self._update_round_blink(
+            getattr(gui, 'current_stage', 1),
+            enabled=bool(getattr(gui, 'is_locked', False)),
+            has_second_round=is_2r_active,
+        )
         
         # 5. 更新裁判狀態燈
         judge_count = int(system_settings.get("judge_count", 5))
@@ -1274,6 +1299,57 @@ class ProjectionWindow(tk.Toplevel):
                 # 未啟用之裁判格：清空數字並重設回暗色未啟用狀態
                 self.canvas.itemconfig(rect_id, fill="#201035", outline="#3b255d")
                 self.canvas.itemconfig(text_id, text="", fill="#ffffff")
+
+    def _paint_round_highlight(self, active_round=None):
+        """繪製回合欄位；active_round 為 None 時顯示中性樣式。"""
+        for round_num, panel, text_item in (
+            (1, self.round_panel_1, self.txt_1r),
+            (2, self.round_panel_2, self.txt_2r),
+        ):
+            is_active = active_round == round_num
+            self.canvas.itemconfig(
+                panel,
+                fill="#4a3508" if is_active else "",
+                outline="#ffd54a" if is_active else "#555555",
+                width=3 if is_active else 1,
+            )
+            self.canvas.itemconfig(text_item, fill="#fff1a8" if is_active else "#d0d0d0")
+
+    def _update_round_blink(self, current_round, enabled, has_second_round):
+        """在比賽準備完成後，僅讓正在評分的回合欄位閃爍。"""
+        active_round = current_round if current_round == 1 or (current_round == 2 and has_second_round) else None
+        key = (active_round, enabled)
+        if not enabled or active_round is None:
+            self._stop_round_blink()
+            return
+        if self._round_blink_key == key and self._round_blink_timer_id is not None:
+            return
+        self._stop_round_blink()
+        self._round_blink_key = key
+        self._round_blink_on = True
+        self._paint_round_highlight(active_round)
+        self._round_blink_timer_id = self.after(1000, self._round_blink_tick)
+
+    def _round_blink_tick(self):
+        if not self.winfo_exists() or self._round_blink_key is None:
+            return
+        active_round, enabled = self._round_blink_key
+        if not enabled:
+            self._stop_round_blink()
+            return
+        self._round_blink_on = not self._round_blink_on
+        self._paint_round_highlight(active_round if self._round_blink_on else None)
+        self._round_blink_timer_id = self.after(1000, self._round_blink_tick)
+
+    def _stop_round_blink(self):
+        if self._round_blink_timer_id is not None:
+            try: self.after_cancel(self._round_blink_timer_id)
+            except: pass
+        self._round_blink_timer_id = None
+        self._round_blink_key = None
+        self._round_blink_on = False
+        if self.round_panel_1 is not None:
+            self._paint_round_highlight()
 
     def on_resize(self, event):
         """當視窗大小改變時重繪漸層背景並更新文字位置"""

@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import tkinter as tk
 from tkinter import messagebox
+from folder_paths import localized_folder
 
 def check_and_update(exe_name, update_source_path):
     """
@@ -58,7 +59,7 @@ def check_and_update(exe_name, update_source_path):
 
         # 開始執行更新流程
         base_dir = os.path.dirname(local_exe)
-        temp_dir = os.path.join(base_dir, "temp_update")
+        temp_dir = str(localized_folder("更新暫存", "temp_update", root=base_dir, create=True))
         os.makedirs(temp_dir, exist_ok=True)
 
         # 複製遠端 exe 到本地暫存

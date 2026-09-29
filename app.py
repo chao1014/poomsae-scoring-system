@@ -12,7 +12,6 @@ warnings.filterwarnings("ignore", category=UserWarning, module="numpy")
 import tkinter as tk
 import threading
 import socket
-import atexit
 import ssl as _ssl_module
 import ipaddress as _ipaddress
 import datetime as _dt
@@ -22,23 +21,6 @@ import config
 import database
 import web_server
 import gui_main
-
-# === Monkey Patch subprocess.Popen for pyngrok Windows encoding issue ===
-import subprocess
-_original_popen = subprocess.Popen
-def _patched_popen(*args, **kwargs):
-    is_ngrok = False
-    if args and isinstance(args[0], list) and args[0] and "ngrok" in str(args[0][0]).lower():
-        is_ngrok = True
-    elif "args" in kwargs and isinstance(kwargs["args"], list) and kwargs["args"] and "ngrok" in str(kwargs["args"][0]).lower():
-        is_ngrok = True
-    
-    if is_ngrok:
-        if kwargs.get("universal_newlines") or kwargs.get("text"):
-            kwargs["encoding"] = "utf-8"
-    return _original_popen(*args, **kwargs)
-subprocess.Popen = _patched_popen
-
 
 # --- 全域設定 ---
 PORT = 5003
@@ -165,7 +147,7 @@ def run_flask():
         web_server.socketio.run(web_server.app, host='0.0.0.0', port=PORT, allow_unsafe_werkzeug=True)
 
 if __name__ == '__main__':
-    # 自動檢查更新（必須在 database.init_db() 與 tkinter 視窗建立前執行）
+    # 自動檢查更新（必須在賽事資料庫初始化與 tkinter 視窗建立前執行）
     try:
         import json as _json_update
         # --onefile 模式下 __file__ 指向暫存解壓目錄，需改用 sys.executable 取得 exe 真實路徑
@@ -191,8 +173,6 @@ if __name__ == '__main__':
         print(f"授權驗證載入失敗: {_lic_err}")
         sys.exit(1)
 
-    database.init_db()
-    
     # Enable High DPI Awareness (System DPI Aware) to prevent the main window from shrinking
     # when the projection window is moved to an external monitor with different DPI scaling.
     import ctypes
@@ -213,90 +193,4 @@ if __name__ == '__main__':
     t.daemon = True
     t.start()
     
-    # 自動啟動 Ngrok Tunnel
-    def start_ngrok():
-        try:
-            # 檢查是否啟用雲端連線
-            config.load_settings()
-            if not config.system_settings.get("enable_cloud", True):
-                print("\n[Ngrok] 雲端連線已停用，不啟動 Ngrok 專屬通道。\n")
-                if gui:
-                    gui.root.after(0, gui.update_qr_code, "")
-                return
-
-            import sys
-            import json
-            if getattr(sys, 'frozen', False):
-                base_dir = os.path.dirname(sys.executable)
-            else:
-                base_dir = os.path.dirname(os.path.abspath(__file__))
-            config_path = os.path.join(base_dir, 'ngrok_config.json')
-            
-            
-            if not os.path.exists(config_path):
-                default_config = {
-                    "auth_token": "請在此填寫您的_Auth_Token",
-                    "domain": "請在此填寫您的_固定網域.ngrok-free.dev"
-                }
-                with open(config_path, 'w', encoding='utf-8') as f:
-                    json.dump(default_config, f, indent=4, ensure_ascii=False)
-                print(f"\n[Ngrok] 尚未設定專屬網址！")
-                print(f"[Ngrok] 系統已自動產生設定檔： {config_path}")
-                print(f"[Ngrok] 請用記事本打開該檔案，填寫後再重新啟動系統。\n")
-                return
-
-            with open(config_path, 'r', encoding='utf-8') as f:
-                cfg = json.load(f)
-            
-            auth_token = cfg.get("auth_token", "").strip()
-            domain = cfg.get("domain", "").strip()
-
-            if not auth_token or "請在此填寫" in auth_token:
-                print(f"\n[Ngrok] 請先至 ngrok_config.json 填寫正確的 Auth Token！\n")
-                return
-
-            from pyngrok import ngrok
-            print(f"[Ngrok] 正在讀取設定並啟動專屬安全通道 ({domain})...")
-            
-            ngrok.set_auth_token(auth_token)
-            public_url = ngrok.connect(PORT, domain=domain).public_url
-            
-            print(f"\n=======================================================")
-            print(f" [Ngrok] 專屬安全通道啟動成功！")
-            print(f" -> 裁判請使用手機開啟此網址：\n {public_url}")
-            print(f"=======================================================\n")
-            
-            if gui:
-                gui.root.after(0, gui.update_qr_code, public_url)
-                
-        except Exception as e:
-            print(f"\n[Ngrok] 無法啟動通道: {e}")
-            print(f"[Ngrok] 請確認網路連線，或檢查設定檔 (ngrok_config.json) 是否設定正確。\n")
-
-    def stop_ngrok():
-        try:
-            from pyngrok import ngrok
-            ngrok.kill()
-            print("\n[Ngrok] 雲端連線已動態關閉並釋放通道。\n")
-        except Exception as e:
-            print(f"[Ngrok] 關閉通道時發生異常: {e}")
-        if gui:
-            gui.root.after(0, gui.update_qr_code, "")
-
-    # 註冊雲端控制回呼至 gui
-    gui.start_tunnel_callback = start_ngrok
-    gui.stop_tunnel_callback = stop_ngrok
-
-    t_ngrok = threading.Thread(target=start_ngrok)
-    t_ngrok.daemon = True
-    t_ngrok.start()
-
-    def cleanup_ngrok():
-        try:
-            from pyngrok import ngrok
-            ngrok.kill()
-        except:
-            pass
-    atexit.register(cleanup_ngrok)
-
     root.mainloop()

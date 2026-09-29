@@ -19,6 +19,8 @@ import database
 from projection import ProjectionWindow
 import gui_dialogs
 from scoring import trimmed_average
+from folder_paths import localized_folder
+from tournament_names import tournament_log_folder
 
 try:
     from screeninfo import get_monitors
@@ -165,6 +167,9 @@ class PoomsaeReplicaGUI:
         
         # === 修改: 程式啟動時載入設定 ===
         config.load_settings()
+        database.set_tournament_db(system_settings["tournament_name"])
+        import lan_records
+        lan_records.start_sync(os.getcwd(), lambda: config.system_settings)
         
         try: self.root.state('zoomed')
         except: self.root.attributes('-fullscreen', True)
@@ -227,7 +232,6 @@ class PoomsaeReplicaGUI:
         self.build_right_panel(main_frame)
         self.build_bottom_panel()
         
-        database.set_tournament_db(system_settings["tournament_name"])
         self.refresh_judge_slots()
         
         # 自動載入並監控上一次所設定的 Excel 資料夾
@@ -274,12 +278,6 @@ class PoomsaeReplicaGUI:
                 try:
                     self.observer.stop()
                     self.observer.join()
-                except:
-                    pass
-            # 停止 Ngrok 安全通道子進程
-            if hasattr(self, 'stop_tunnel_callback') and self.stop_tunnel_callback:
-                try:
-                    self.stop_tunnel_callback()
                 except:
                     pass
             self.root.destroy()
@@ -482,18 +480,9 @@ class PoomsaeReplicaGUI:
 
     def update_court_label(self):
         court_no = system_settings.get("court_no", 1)
-        enable_cloud = system_settings.get("enable_cloud", True)
-        
-        if not enable_cloud:
-            self.lbl_court.config(text=f"第 {court_no} 場地\n(點擊顯示QR)", font=("Microsoft JhengHei", 12, "bold"), cursor="hand2")
-            self.lbl_court.bind("<Button-1>", self.show_qr_popup)
-        elif hasattr(self, 'cloudflare_url') and self.cloudflare_url:
-            self.lbl_court.config(text=f"第 {court_no} 場地\n(點擊顯示QR)", font=("Microsoft JhengHei", 12, "bold"), cursor="hand2")
-            self.lbl_court.bind("<Button-1>", self.show_qr_popup)
-        else:
-            self.lbl_court.config(text=f"第 {court_no} 場地\n(準備中...)", font=("Microsoft JhengHei", 12, "bold"), cursor="")
-            self.lbl_court.unbind("<Button-1>")
-
+        self.lbl_court.config(text=f"第 {court_no} 場地\n(點擊顯示QR)",
+                              font=("Microsoft JhengHei", 12, "bold"), cursor="hand2")
+        self.lbl_court.bind("<Button-1>", self.show_qr_popup)
     def build_header(self):
         header_container = tk.Frame(self.root, bg="white", pady=1)
         header_container.pack(fill="x")
@@ -1542,7 +1531,7 @@ class PoomsaeReplicaGUI:
             if self.current_match_uuid:
                 try:
                     import sqlite3
-                    conn = sqlite3.connect(database.get_db_path())
+                    conn = database.get_connection()
                     c = conn.cursor()
                     c.execute("""
                         UPDATE scores 
@@ -1707,10 +1696,6 @@ class PoomsaeReplicaGUI:
     def open_settings(self):
         gui_dialogs.open_settings(self)
 
-    def update_qr_code(self, url):
-        self.cloudflare_url = url
-        self.update_court_label()
-
     def show_qr_popup(self, event=None):
         if hasattr(self, 'qr_popup_window') and self.qr_popup_window and self.qr_popup_window.winfo_exists():
             self.qr_popup_window.lift()
@@ -1840,7 +1825,7 @@ class PoomsaeReplicaGUI:
                 # === 新增: 重開軟體時，從 SQLite 資料庫中恢復已完賽選手的 Status 與 final_score ===
                 try:
                     import sqlite3
-                    conn = sqlite3.connect(database.get_db_path())
+                    conn = database.get_connection()
                     c = conn.cursor()
                     c.execute("""
                         SELECT DISTINCT round FROM scores WHERE match_uuid = ?
@@ -2979,13 +2964,13 @@ class PoomsaeReplicaGUI:
             end_time_str = now.strftime("%Y%m%d%H%M%S")
             log_time_str = now.strftime("%Y/%m/%d %H:%M:%S")
             date_str = now.strftime("%Y_%m_%d")
-            os.makedirs("daily_logs", exist_ok=True)
-            filename = os.path.join("daily_logs", f"log.1.0.14_{date_str}.html")
+            daily_dir = localized_folder("每日比賽log", ("每日紀錄", "daily_logs"), create=True)
+            filename = os.path.join(daily_dir, f"log.1.0.14_{date_str}.html")
             
             # 2. 判斷是否為棄權 (Withdraw)
             # 優先從資料庫讀取完整數據，若無資料（如比賽未結束或棄權）才從 temp_scores 讀取
             rows = []
-            conn = sqlite3.connect(database.get_db_path())
+            conn = database.get_connection()
             c = conn.cursor()
             try:
                 c.execute("""
@@ -3579,7 +3564,7 @@ class PoomsaeReplicaGUI:
         uids_to_query = [uid for uid, _ in group_players]
         scores_by_uid = {}
         if uids_to_query:
-            conn = sqlite3.connect(database.get_db_path())
+            conn = database.get_connection()
             c = conn.cursor()
             try:
                 placeholders = ",".join(["?"] * len(uids_to_query))
@@ -3978,9 +3963,9 @@ class PoomsaeReplicaGUI:
         header_template = f"<!DOCTYPE html><html><head><meta charset='UTF-8'><title>LOG</title><style>table {{table-layout: fixed; width: 100%; border-collapse: collapse;}} td {{height: 20px; text-align: center; word-wrap: break-word;}}</style></head><body>\n<h1 style='text-align: center; border-top: 2px solid #888; border-bottom: 2px solid #888; height: 50px; line-height: 50px;'> GAME RESULT </h1>\n<p style='text-align: right; '> TIME : {log_time_str}</p>\n<table style='width: 100%;border-spacing: 0px; font-size: 13px;' border='1'>\n<tr>\n<td style='width: 13%;'>Court</td>\n<td style='width: 13%;'>No.</td>\n<td style='width: 13%;'>Game method</td>\n<td style='width: 13%;'>Type</td>\n<td style='width: 13%;'>Category</td>\n<td style='width: 13%;'>Division</td>\n<td style='width: 13%;'>Phase</td>\n<td style='width: 9%;'>End Time</td>\n</tr><tr>\n<td>Noc (Chung)</td>\n<td>Team (Chung)</td>\n<td>Name (Chung)</td>\n<td>Noc (Hong)</td>\n<td>Team (Hong)</td>\n<td>Name (Hong)</td>\n<td>Result</td>\n<td></td>\n</tr><tr>\n<td>*1R (Chung) (A/ P/ D/ Avg/ Tot)</td>\n<td>*2R (Chung) (A/ P/ D/ Avg/ Tot)</td>\n<td>**Total (Chung) (A/ P/ D/ Avg/ Tot)</td>\n<td>*1R (Hong) (A/ P/ D/ Avg/ Tot)</td>\n<td>*2R (Hong) (A/ P/ D/ Avg/ Tot)</td>\n<td>**Total (Hong) (A/ P/ D/ Avg/ Tot)</td>\n<td></td>\n<td></td>\n</tr><tr>\n<td>1R J1(Chung)</td>\n<td>1R J2(Chung)</td>\n<td>1R J3(Chung)</td>\n<td>1R J4(Chung)</td>\n<td>1R J5(Chung)</td>\n<td>1R J6(Chung)</td>\n<td>1R J7(Chung)</td>\n<td></td>\n</tr><tr>\n<td>2R J1(Chung)</td>\n<td>2R J2(Chung)</td>\n<td>2R J3(Chung)</td>\n<td>2R J4(Chung)</td>\n<td>2R J5(Chung)</td>\n<td>2R J6(Chung)</td>\n<td>2R J7(Chung)</td>\n<td></td>\n</tr><tr>\n<td>1R J1(Hong)</td>\n<td>1R J2(Hong)</td>\n<td>1R J3(Hong)</td>\n<td>1R J4(Hong)</td>\n<td>1R J5(Hong)</td>\n<td>1R J6(Hong)</td>\n<td>1R J7(Hong)</td>\n<td></td>\n</tr><tr>\n<td>2R J1(Hong)</td>\n<td>2R J2(Hong)</td>\n<td>2R J3(Hong)</td>\n<td>2R J4(Hong)</td>\n<td>2R J5(Hong)</td>\n<td>2R J6(Hong)</td>\n<td>2R J7(Hong)</td>\n<td></td>\n</tr><tr>\n<td colspan='8' style='height: 5px'></td>\n</tr>\n"
         
         import os
-        os.makedirs("match_logs", exist_ok=True)
+        match_log_dir = tournament_log_folder(os.getcwd(), config.system_settings.get("tournament_name"), create=True)
         safe_title = "".join([c for c in html_title if c.isalnum() or c in (' ', '-', '_')]).strip()
-        match_log_path = os.path.join("match_logs", f"log_{safe_title}.html")
+        match_log_path = os.path.join(match_log_dir, f"log_{safe_title}.html")
         
         with open(match_log_path, "w", encoding="utf-8") as f:
             f.write(header_template + all_html_blocks + "</table></body></html>")
@@ -4243,7 +4228,7 @@ class PoomsaeReplicaGUI:
             
         import sqlite3
         try:
-            conn = sqlite3.connect(database.get_db_path())
+            conn = database.get_connection()
             c = conn.cursor()
             try:
                 c.execute("""

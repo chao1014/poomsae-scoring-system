@@ -1,0 +1,16 @@
+{
+    "countdown_sec": 90,
+    "slide_duration": 3,
+    "judge_count": 5,
+    "court_no": 1,
+    "score_hub_ip": "",
+    "tournament_name": "Default",
+    "poomsae_excel_path": "style.xlsx",
+    "draw_range_start": "",
+    "draw_range_end": "",
+    "session_poomsae": {},
+    "show_draw_button": true,
+    "pk_sequence_mode": 1,
+    "last_excel_directory": "",
+    "update_source": ""
+}

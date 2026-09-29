@@ -52,6 +52,9 @@ pip install -r requirements.txt
 2. 打包完成後，輸出檔案會存放在 `dist/` 目錄中。
 3. 詳細的打包邏輯與授權碼產生方式，請參考 [打包與授權說明.md](file:///D:/品勢計分系統/打包與授權說明.md)。
 
+> [!IMPORTANT]
+> `settings.json` 是每台電腦的本機設定，可能包含內網 IP、共用資料夾路徑與最近使用的賽事資料，因此不會提交到 GitHub。首次從 GitHub 取得專案時，請複製 `settings.example.json` 為 `settings.json`，再依實際場地修改；程式也會在儲存設定時自動建立 `settings.json`。
+
 ---
 
 ## 4. GitHub 備份與同步流程
@@ -92,5 +95,6 @@ git pull origin main
 - **`*.db`**：本地測試或產生的 SQLite 資料庫檔案。
 - **`build/`、`dist/`、`*.spec`**：打包產生的暫存與輸出檔案，每次打包皆可重新產生。
 - **`*.log`**：系統產生的除錯日誌。
+- **`settings.json`**：每台電腦專屬的網路與賽事設定；請使用 `settings.example.json` 作為可安全提交的範本。
 
 如果您有其他需要忽略的檔案，請直接編輯 [`.gitignore`](file:///D:/品勢計分系統/.gitignore)。

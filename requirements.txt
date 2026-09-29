@@ -8,7 +8,6 @@ eventlet
 xlrd
 openpyxl
 pyinstaller
-pyngrok
 screeninfo
 watchdog
 xlwt

@@ -2,6 +2,7 @@ import os
 import sqlite3
 import threading
 from datetime import datetime
+from folder_paths import localized_folder
 
 # 預設資料庫名稱
 current_db_name = "default_match.db"
@@ -29,36 +30,50 @@ def set_tournament_db(name):
     date_str = datetime.now().strftime("%Y_%m_%d")
     current_db_name = f"{safe_name}_{date_str}.db"
 
-    # 切換後確保該資料庫有建立表格
-    init_db()
+    # 僅選定檔名；第一筆完賽成績寫入時才建立資料庫。
     return current_db_name
 
 
 def get_db_path():
-    os.makedirs("databases", exist_ok=True)
-    return os.path.join("databases", current_db_name)
+    return str(localized_folder("前台資料庫", ("比分資料", "databases")) / current_db_name)
 
 
-def get_connection():
-    """
-    統一取得 SQLite 連線，並套用並行存取相關設定。
-
-    - WAL 模式：提升讀寫並行能力。
-    - busy_timeout=5000：遇到資料庫鎖定時最多等待 5 秒。
-    - synchronous=NORMAL：搭配 WAL 模式，在效能與安全性間取得平衡。
-    """
-    conn = sqlite3.connect(get_db_path(), timeout=5.0)
+def _open_connection(create=False):
+    path = get_db_path()
+    if create:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        conn = sqlite3.connect(path, timeout=5.0)
+    elif os.path.isfile(path):
+        # mode=rw 防止檔案被移除時，查詢意外建立新的空資料庫。
+        from pathlib import Path
+        conn = sqlite3.connect(Path(path).resolve().as_uri() + "?mode=rw",
+                               uri=True, timeout=5.0)
+    else:
+        # 尚無完賽資料時，查詢與清除操作使用空白記憶體資料表。
+        conn = sqlite3.connect(":memory:")
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA busy_timeout=5000;")
     conn.execute("PRAGMA synchronous=NORMAL;")
     return conn
 
 
-def init_db():
-    """初始化當前選擇的資料庫，並安全執行 Schema 升級。"""
-    with _db_init_lock:
-        conn = get_connection()
+def get_connection(create=False):
+    """預設不建立磁碟檔；只有儲存成績可以指定 create=True。"""
+    conn = _open_connection(create=create)
+    try:
+        init_db(conn)
+        return conn
+    except Exception:
+        conn.close()
+        raise
 
+
+def init_db(conn=None):
+    """初始化資料表；未指定連線時也不建立新的磁碟檔案。"""
+    owns_connection = conn is None
+    if owns_connection:
+        conn = _open_connection()
+    with _db_init_lock:
         try:
             # 立即取得寫入鎖，確保初始化與 ALTER TABLE 序列化執行
             conn.execute("BEGIN IMMEDIATE")
@@ -113,7 +128,8 @@ def init_db():
             raise
 
         finally:
-            conn.close()
+            if owns_connection:
+                conn.close()
 
 
 def save_score(
@@ -132,7 +148,7 @@ def save_score(
     player_side=0,
 ):
     """儲存單一裁判分數，包含細項評分與方位，若已存在則覆蓋"""
-    conn = get_connection()
+    conn = get_connection(create=True)
     c = conn.cursor()
 
     # 先刪除同場次、同輪次、同裁判、同方位的舊分數，避免重複寫入
@@ -176,7 +192,7 @@ def save_scores_batch(scores_list):
     if not scores_list:
         return
 
-    conn = get_connection()
+    conn = get_connection(create=True)
     c = conn.cursor()
 
     try:

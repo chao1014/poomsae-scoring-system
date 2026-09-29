@@ -14,79 +14,73 @@ from datetime import datetime
 SECRET_KEY = b"PoomsaeScoringSystemKey2026_Sec"
 LICENSE_FILE_NAME = "license.lic"
 
+class HardwareIdentifierError(RuntimeError):
+    """Raised when the SMBIOS UUID required for license binding is unavailable."""
+
+
+def _get_hidden_startupinfo():
+    """Hide the PowerShell window when the verifier runs from the GUI app."""
+    if sys.platform != "win32":
+        return None
+
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    return startupinfo
+
+
+def _normalize_smbios_uuid(value):
+    """Return a canonical SMBIOS UUID, or ``None`` when the value is unusable."""
+    value = value.strip().strip("{}").upper()
+    if not value:
+        return None
+
+    try:
+        parsed = uuid.UUID(value)
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+    # Some firmware exposes an unprogrammed placeholder instead of a real UUID.
+    if parsed.int in (0, (1 << 128) - 1):
+        return None
+
+    return str(parsed).upper()
+
+
 def get_hardware_info():
-    """
-    獲取硬體特徵資訊。
-    優先使用主機板 UUID 與 CPU ID，若無效或取得失敗則退回使用 MAC 位址。
-    """
-    uuid_str = ""
-    cpu_str = ""
-    
-    # 1. 嘗試獲取主機板 UUID
+    """Read the motherboard SMBIOS UUID, the only source used for license binding."""
     try:
-        startupinfo = None
-        if sys.platform == 'win32':
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            
         output = subprocess.check_output(
-            "wmic csproduct get uuid", 
-            shell=True, 
-            startupinfo=startupinfo,
-            stderr=subprocess.DEVNULL
-        ).decode('utf-8', errors='ignore')
-        
-        lines = [line.strip() for line in output.split('\n') if line.strip()]
-        if len(lines) > 1:
-            val = lines[1].strip()
-            # 排除無效或預設的 UUID
-            if val and "00000000" not in val and "FFFFFFFF" not in val:
-                uuid_str = val
-    except Exception:
-        pass
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "(Get-CimInstance -ClassName Win32_ComputerSystemProduct -ErrorAction Stop).UUID",
+            ],
+            startupinfo=_get_hidden_startupinfo(),
+            stderr=subprocess.DEVNULL,
+            timeout=10,
+        ).decode("utf-8", errors="ignore")
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise HardwareIdentifierError(
+            "無法讀取主機板 SMBIOS UUID，未產生機器碼。"
+        ) from exc
 
-    # 2. 嘗試獲取 CPU ID
-    try:
-        startupinfo = None
-        if sys.platform == 'win32':
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            
-        output = subprocess.check_output(
-            "wmic cpu get processorid", 
-            shell=True, 
-            startupinfo=startupinfo,
-            stderr=subprocess.DEVNULL
-        ).decode('utf-8', errors='ignore')
-        
-        lines = [line.strip() for line in output.split('\n') if line.strip()]
-        if len(lines) > 1:
-            cpu_str = lines[1].strip()
-    except Exception:
-        pass
+    for line in output.splitlines():
+        smbios_uuid = _normalize_smbios_uuid(line)
+        if smbios_uuid:
+            return smbios_uuid
 
-    # 3. 組合硬體資訊
-    hardware_concat = f"{uuid_str}_{cpu_str}".strip("_")
-    
-    # 4. 若皆無效，則使用 MAC 位址
-    if not hardware_concat or len(hardware_concat) < 5:
-        mac_num = uuid.getnode()
-        hardware_concat = f"MAC-{mac_num}"
-        
-    return hardware_concat
+    raise HardwareIdentifierError(
+        "主機板 SMBIOS UUID 無效或無法讀取，未產生機器碼。"
+    )
+
 
 def generate_machine_id():
-    """
-    根據硬體特徵生成唯一的 16 碼機器碼 (格式: TK-XXXX-XXXX-XXXX-XXXX)
-    """
+    """Generate a TK machine ID from the motherboard SMBIOS UUID only."""
     hardware_str = get_hardware_info()
-    sha = hashlib.sha256(hardware_str.encode('utf-8')).hexdigest().upper()
-    # 取前 16 碼並分段
-    part1 = sha[0:4]
-    part2 = sha[4:8]
-    part3 = sha[8:12]
-    part4 = sha[12:16]
-    return f"TK-{part1}-{part2}-{part3}-{part4}"
+    sha = hashlib.sha256(hardware_str.encode("utf-8")).hexdigest().upper()
+    return f"TK-{sha[0:4]}-{sha[4:8]}-{sha[8:12]}-{sha[12:16]}"
 
 def calculate_signature(data_dict):
     """
@@ -175,7 +169,11 @@ def load_and_verify(module_name):
     載入並驗證授權檔案，以及校驗「最後執行時間」防篡改。
     回傳: (is_valid, error_code, detail, current_machine_id)
     """
-    current_machine_id = generate_machine_id()
+    try:
+        current_machine_id = generate_machine_id()
+    except HardwareIdentifierError as exc:
+        return False, "HARDWARE_ID_READ_FAILED", str(exc), ""
+
     lic_path = get_license_path()
     
     if not os.path.exists(lic_path):
@@ -240,6 +238,18 @@ def check_and_enforce(module_name):
         return detail
         
     # 授權失敗，尋求註冊介面
+    if err_code == "HARDWARE_ID_READ_FAILED":
+        try:
+            import tkinter as tk
+            from tkinter import messagebox
+            root = tk.Tk()
+            root.withdraw()
+            messagebox.showerror("硬體識別讀取失敗", detail)
+            root.destroy()
+        except Exception:
+            print(f"硬體識別讀取失敗: {detail}")
+        sys.exit(1)
+
     try:
         from packaging_tools.register_gui import show_registration_window
         success = show_registration_window(module_name, machine_id, f"錯誤代碼: {err_code} ({detail})")
