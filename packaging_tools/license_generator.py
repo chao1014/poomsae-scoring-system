@@ -27,7 +27,7 @@ class LicenseGeneratorGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("品勢計分系統 - 授權金鑰產生器 v1.0")
-        self.root.geometry("560x420")
+        self.root.geometry("560x470")
         self.root.resizable(False, False)
         
         # 設定視窗置中
@@ -79,18 +79,17 @@ class LicenseGeneratorGUI:
         
         self.chk_all_var = tk.BooleanVar(value=True)
         self.chk_poomsae_var = tk.BooleanVar(value=True)
+        self.chk_score_hub_var = tk.BooleanVar(value=True)
         
         # 全選勾選事件
         def toggle_all():
             val = self.chk_all_var.get()
             self.chk_poomsae_var.set(val)
+            self.chk_score_hub_var.set(val)
             
         # 個別勾選事件
         def update_all_checkbox():
-            if self.chk_poomsae_var.get():
-                self.chk_all_var.set(True)
-            else:
-                self.chk_all_var.set(False)
+            self.chk_all_var.set(self.chk_poomsae_var.get() and self.chk_score_hub_var.get())
             
         self.chk_all = ttk.Checkbutton(modules_frame, text="全選 / 全部模組通配 (*)", variable=self.chk_all_var, command=toggle_all)
         self.chk_all.pack(anchor="w", pady=2)
@@ -99,6 +98,8 @@ class LicenseGeneratorGUI:
         
         self.chk_poomsae = ttk.Checkbutton(modules_frame, text="品勢計分主系統 (poomsae)", variable=self.chk_poomsae_var, command=update_all_checkbox)
         self.chk_poomsae.pack(anchor="w", pady=2)
+        self.chk_score_hub = ttk.Checkbutton(modules_frame, text="多場地比分後台 (score_hub)", variable=self.chk_score_hub_var, command=update_all_checkbox)
+        self.chk_score_hub.pack(anchor="w", pady=2)
         
         # 產生按鈕
         btn_generate = ttk.Button(main_frame, text="⚙ 產生並儲存授權檔案 (license.lic)", style="Btn.TButton", command=self.generate_license)
@@ -138,6 +139,7 @@ class LicenseGeneratorGUI:
             modules.append("*")
         else:
             if self.chk_poomsae_var.get(): modules.append("poomsae")
+            if self.chk_score_hub_var.get(): modules.append("score_hub")
             
         if not modules:
             messagebox.showerror("錯誤", "請至少選擇一項授權模組！")

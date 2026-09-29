@@ -249,6 +249,8 @@ class ScoreHub(tk.Tk):
 
 if __name__ == '__main__':
     try:
+        from packaging_tools.license_verifier import check_and_enforce
+        check_and_enforce("score_hub")
         ScoreHub().mainloop()
     except (ValueError, OSError, sqlite3.Error) as exc:
         messagebox.showerror('後台無法啟動', f'無法讀取資料或啟動接收服務（請確認 5004 未被占用）：{exc}')

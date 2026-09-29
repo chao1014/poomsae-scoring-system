@@ -192,7 +192,7 @@ def parse_modules_from_imports(import_statements):
                         modules.add(f"{parent_mod}.{sub_item}")
     return list(modules)
 
-def run_pyinstaller(script_name, exe_name, is_gui=False):
+def run_pyinstaller(script_name, exe_name, is_gui=False, dist_path=None):
     """執行 PyArmor 混淆並透過 PyInstaller 打包。若混淆失敗則自動降級為一般打包。"""
     script_path = os.path.join(BASE_DIR, script_name)
     if not os.path.exists(script_path):
@@ -260,7 +260,7 @@ def run_pyinstaller(script_name, exe_name, is_gui=False):
         "--paths", BASE_DIR,
         "--specpath", PACKAGING_DIR,
         "--workpath", BUILD_DIR,
-        "--distpath", DIST_DIR,
+        "--distpath", dist_path or DIST_DIR,
         "--name", exe_name,
         # 品勢計分系統特有的資源與子模組參數
         "--add-data", f"{os.path.join(BASE_DIR, 'static')};static",
@@ -329,6 +329,17 @@ def copy_config_files():
     except Exception as e:
         print(f"  - [WARN] 同步 settings.json 失敗: {e}")
 
+def create_score_hub_launcher():
+    """在發布目錄建立可直接開啟已打包後台的捷徑批次檔。"""
+    launcher_path = os.path.join(POOMSAE_SYSTEM_DIR, "開啟後台.bat")
+    launcher_text = "@echo off\r\nstart \"Poomsae Score Hub\" \"%~dp0PoomsaeScoreHub\\PoomsaeScoreHub.exe\"\r\nexit\r\n"
+    try:
+        with open(launcher_path, "w", encoding="utf-8") as f:
+            f.write(launcher_text)
+        print("  - 已建立後台啟動檔：開啟後台.bat")
+    except OSError as e:
+        print(f"  - [WARN] 建立後台啟動檔失敗: {e}")
+
 def main():
     print("==========================================")
     print("      品勢計分系統 一鍵加固打包腳本 v1.0")
@@ -341,11 +352,16 @@ def main():
     
     clean_previous_builds()
     
-    # 打包主程式 app.py 為 PoomsaeScoringSystem.exe (保留命令提示字元控制台，is_gui=False)
-    success = run_pyinstaller("app.py", "PoomsaeScoringSystem", is_gui=False)
+    # 打包主程式與多場地比分後台；後台放在主程式發布目錄以共用 license.lic。
+    main_success = run_pyinstaller("app.py", "PoomsaeScoringSystem", is_gui=False)
+    hub_success = main_success and run_pyinstaller(
+        "score_hub.py", "PoomsaeScoreHub", is_gui=True, dist_path=POOMSAE_SYSTEM_DIR
+    )
+    success = main_success and hub_success
             
     if success:
         copy_config_files()
+        create_score_hub_launcher()
         
         # 還原關鍵資料
         restore_poomsae_data()
